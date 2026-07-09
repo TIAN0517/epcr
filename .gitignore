@@ -1,0 +1,7 @@
+epcr_secrets.env
+data/epcr_secrets.env
+*.pkl
+__pycache__/
+*.pyc
+.env
+.venv/
