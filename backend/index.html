@@ -1,0 +1,1485 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>智慧雲端動態救護系統</title>
+<!-- build: 2026-07-06-emic-v2 -->
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="apple-touch-icon" href="/images/bird50.png">
+<meta name="theme-color" content="#17c7c1">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.4.1/dist/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --epcr:#17c7c1;--epcr-dark:#008883;--bg:#060a10;--glass:rgba(10,16,28,.9);--border:rgba(255,255,255,.1);
+  --text:#e8edf5;--muted:#8a9bb5;--green:#22c55e;--red:#ef4444;--yellow:#ffd700;
+  --dock-left-w:328px;--dock-right-w:380px;
+}
+html,body{height:100%;overflow:hidden;font-family:"Microsoft JhengHei","Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--text)}
+#map{position:fixed;top:56px;left:var(--dock-left-w);right:var(--dock-right-w);bottom:0;z-index:10;pointer-events:auto}
+.leaflet-container{font-family:inherit}
+.leaflet-pane,.leaflet-top,.leaflet-bottom{z-index:1}
+
+/* ── 登入頁（EPCR 原站風格） ── */
+#login{position:fixed;inset:0;z-index:100;background:#000 url(/images/login110.png) center/cover no-repeat}
+.login-wrap{display:flex;align-items:stretch;min-height:100%;max-width:1024px;margin:0 auto;padding:0 50px}
+.login-left{width:340px;display:flex;flex-direction:column;justify-content:center;padding:40px 0}
+.login-brand{margin-bottom:28px}
+.login-brand .bird{width:50px;height:50px;vertical-align:middle;margin-right:6px}
+.login-brand .org{color:var(--yellow);font-size:22px;font-weight:700;vertical-align:middle}
+.login-brand .title-zh{color:#fff;font-size:30px;font-weight:700;line-height:1.25;margin:10px 0 4px}
+.login-brand .title-en{color:rgba(255,255,255,.85);font-size:13px;letter-spacing:.3px}
+.login-form .input-group{width:100%;margin-bottom:10px}
+.login-form .input-group-addon{background:#fff;border:1px solid #ccc;color:var(--epcr-dark);padding:10px 14px}
+.login-form .form-control{height:46px;font-size:16px;border:1px solid #ccc;box-shadow:none}
+.login-form .form-control:focus{border-color:var(--epcr);box-shadow:0 0 0 2px rgba(23,199,193,.25)}
+.btn-login{width:100%;padding:12px;font-size:18px;font-weight:600;border:1px solid #ccc;background:linear-gradient(180deg,#f8f8f8,#e8e8e8);color:#333;border-radius:4px;cursor:pointer;margin-top:6px}
+.btn-login:hover{background:linear-gradient(180deg,#fff,#efefef)}
+.login-err{color:var(--yellow);font-size:14px;font-weight:700;margin-top:12px;min-height:1.2em}
+
+/* ── 儀表板 ── */
+#app{position:relative;z-index:20;height:100%;pointer-events:none}
+#app .topbar,#app .dock-left,#app .dock-right,#app .mobile-nav,#app .alert-bar{pointer-events:auto}
+.topbar{position:fixed;top:0;left:0;right:0;z-index:40;height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;padding-left:max(20px,env(safe-area-inset-left));padding-right:max(20px,env(safe-area-inset-right));background:var(--epcr);border-bottom:2px solid var(--epcr-dark);box-shadow:0 2px 12px rgba(0,0,0,.3)}
+.topbar .brand{display:flex;align-items:center;gap:12px;min-width:0}
+.topbar .brand img{width:36px;height:36px;flex-shrink:0}
+.topbar h1{font-size:1rem;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar .meta{font-size:.8rem;color:rgba(255,255,255,.9);margin-top:2px}
+.topbar .right{display:flex;gap:10px;align-items:center;flex-shrink:0}
+.chip{padding:6px 12px;border-radius:999px;font-size:.8rem;border:1px solid rgba(255,255,255,.35);background:rgba(0,0,0,.15);color:#fff;white-space:nowrap}
+.chip.live{border-color:#fff;background:rgba(255,255,255,.2)}
+.btn-sm{padding:8px 14px;border-radius:6px;border:1px solid rgba(255,255,255,.45);background:rgba(255,255,255,.14);color:#fff;font-size:.82rem;cursor:pointer;white-space:nowrap}
+.btn-sm:hover{background:rgba(255,255,255,.26)}
+
+.dock-left{position:fixed;top:56px;left:0;bottom:0;width:var(--dock-left-w);z-index:30;display:flex;flex-direction:column;padding:8px;overflow:hidden;background:rgba(6,10,16,.94);border-right:1px solid var(--border)}
+.left-hub{flex:1;min-height:0;display:flex;flex-direction:column}
+.quick-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:10px 12px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.22);flex-shrink:0}
+.quick-strip .q{text-align:center;padding:8px 4px;border-radius:8px;background:rgba(0,0,0,.28);border:1px solid var(--border)}
+.quick-strip .qv{font-size:1.15rem;font-weight:800;color:var(--epcr);line-height:1.1}
+.quick-strip .qv.hot{color:var(--green)}
+.quick-strip #quick-emic.hot{color:#fbbf24}
+.quick-strip .ql{font-size:.62rem;color:var(--muted);margin-top:4px;line-height:1.2}
+.left-tabs{display:flex;gap:4px;padding:8px 10px 0;border-bottom:1px solid var(--border);background:rgba(0,0,0,.15);flex-shrink:0;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.left-tab{flex:1;padding:9px 3px;border:none;border-radius:8px 8px 0 0;background:transparent;color:var(--muted);font-size:.7rem;font-weight:700;cursor:pointer;touch-action:manipulation;white-space:nowrap;min-width:0}
+.left-tab.emic-tab{color:#fbbf24}
+.left-tab.emic-tab.on{background:rgba(251,191,36,.18);border-color:rgba(251,191,36,.45)}
+.left-tab .emic-n{color:#fbbf24}
+.left-tab.on{background:rgba(23,199,193,.2);color:#fff;border:1px solid var(--border);border-bottom-color:transparent}
+.left-pane{display:none;flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;flex-direction:column}
+.left-pane.on{display:flex}
+.left-pane .section-pad{padding:12px 14px}
+.left-pane .section-title{font-size:.78rem;color:var(--muted);margin:4px 0 10px;font-weight:600}
+.edt-note{font-size:.68rem;color:var(--muted);line-height:1.45;padding:0 14px 12px}
+.edt-sync{font-size:.7rem;color:var(--green);padding:0 14px 4px}
+.left-more-tabs{display:flex;gap:6px;padding:10px 12px 0;flex-shrink:0}
+.left-more-tab{flex:1;padding:8px 6px;border:1px solid var(--border);border-radius:8px;background:rgba(0,0,0,.2);color:var(--muted);font-size:.72rem;font-weight:600;cursor:pointer}
+.left-more-tab.on{background:rgba(23,199,193,.18);color:#fff;border-color:var(--epcr)}
+.left-more-pane{display:none;flex:1;overflow:auto;min-height:0}
+.left-more-pane.on{display:block}
+.dock-right{position:fixed;top:56px;right:0;bottom:0;width:var(--dock-right-w);z-index:30;display:flex;flex-direction:column;gap:8px;padding:10px;background:rgba(4,12,18,.96);border-left:2px solid var(--epcr)}
+.dock-right .panel-disp-main{flex:1.15;min-height:0;border:1px solid rgba(23,199,193,.3)}
+.panel-emic-side{flex:.85;min-height:180px;max-height:42%;border:1px solid rgba(251,191,36,.35)!important}
+.panel-emic-side .panel-h{background:rgba(251,191,36,.14)!important;color:#fff}
+.panel-emic-side .panel-h .glyphicon{color:#fbbf24}
+.panel-emic-side .panel-h .badge{background:#fbbf24;color:#422006}
+.btn-sm.emic-top.on{background:rgba(251,191,36,.28);border-color:#fbbf24;color:#fff}
+.btn-sm.emic-top .emic-badge{display:inline-block;min-width:18px;padding:0 5px;margin-left:4px;border-radius:999px;background:#fbbf24;color:#422006;font-size:.72rem;font-weight:800}
+
+.panel{background:rgba(8,14,24,.96);border:1px solid var(--border);border-radius:10px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 4px 16px rgba(0,0,0,.3);min-height:0}
+.panel.flex-1{flex:1}
+.panel-h{padding:12px 16px;font-size:.9rem;font-weight:700;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;color:#fff;background:rgba(23,199,193,.12);flex-shrink:0}
+.panel-h .glyphicon{margin-right:8px;color:var(--epcr)}
+.panel-h .badge{background:var(--epcr);color:#042a28;padding:2px 10px;border-radius:999px;font-size:.78rem;font-weight:700}
+.panel-b{overflow:auto;flex:1;-webkit-overflow-scrolling:touch}
+
+.bottom-tabs{display:flex;gap:8px;padding:10px 12px 0;border-bottom:1px solid var(--border);background:rgba(0,0,0,.2);flex-shrink:0}
+.bottom-tab{flex:1;padding:10px 8px;border:none;border-radius:8px 8px 0 0;background:transparent;color:var(--muted);font-size:.82rem;font-weight:600;cursor:pointer}
+.bottom-tab.on{background:rgba(23,199,193,.18);color:#fff;border:1px solid var(--border);border-bottom-color:transparent}
+.bottom-pane{display:none;flex:1;overflow:auto;min-height:140px;max-height:200px;-webkit-overflow-scrolling:touch}
+.bottom-pane.on{display:block}
+
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:4px 0 8px}
+.stat-grid .stat-item{padding:16px 12px}
+.stat-item{text-align:center;padding:14px 10px;background:rgba(0,0,0,.3);border-radius:10px;border:1px solid var(--border)}
+.stat-item .v{font-size:1.75rem;font-weight:800;color:var(--epcr);line-height:1.1}
+.stat-item .v.hot{color:var(--green)}
+.stat-item .l{font-size:.78rem;color:var(--muted);margin-top:6px}
+.edt-kpi{padding:12px 14px;display:grid;gap:10px}
+.edt-today{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.edt-today .item{background:rgba(0,0,0,.28);border:1px solid var(--border);border-radius:8px;padding:8px 6px;text-align:center}
+.edt-today .v{font-size:1rem;font-weight:800;color:#fff;line-height:1.2}
+.edt-today .l{font-size:.66rem;color:var(--muted);margin-top:4px;line-height:1.3}
+.edt-meter{font-size:.78rem}
+.edt-meter .row{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;color:#fff}
+.edt-meter .pct{font-weight:800;color:var(--epcr)}
+.edt-bar{height:7px;background:rgba(0,0,0,.35);border-radius:4px;overflow:hidden;margin-bottom:8px}
+.edt-bar>i{display:block;height:100%;border-radius:4px;min-width:2px}
+.edt-bar.veh>i{background:linear-gradient(90deg,#ED5603,#FFF33F)}
+.edt-bar.br>i{background:linear-gradient(90deg,#27255F,#77D1F6)}
+.edt-bar.avail>i{background:linear-gradient(90deg,#CC0000,#FF6666)}
+
+.branch-table{width:100%;font-size:.8rem}
+.branch-table th,.branch-table td{padding:8px 10px;border-bottom:1px solid var(--border)}
+.branch-table th{color:var(--muted);font-size:.72rem}
+.branch-table td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
+.branch-table tr.hot td{color:#fff;background:rgba(23,199,193,.08)}
+
+.new-item,.img-item,.evt-item,.branch-item{padding:12px 16px;border-bottom:1px solid var(--border);font-size:.88rem;line-height:1.45;cursor:pointer}
+.new-item:hover,.img-item:hover,.evt-item:hover,.branch-item:hover{background:rgba(23,199,193,.1)}
+.emic-item{padding:12px 14px;border-bottom:1px solid var(--border);cursor:pointer;line-height:1.45}
+.emic-item:hover{background:rgba(251,191,36,.08)}
+.emic-item.on{background:rgba(251,191,36,.14);outline:1px solid rgba(251,191,36,.35)}
+.emic-item .emic-cat{color:#fbbf24;font-weight:800;font-size:.9rem}
+.emic-item .emic-addr{color:var(--muted);font-size:.78rem;margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.emic-item .emic-meta{font-size:.72rem;color:var(--muted);margin-top:6px;display:flex;justify-content:space-between;gap:8px}
+.emic-item .emic-near{color:var(--epcr);font-weight:700}
+.emic-filters{display:flex;gap:6px;padding:10px 12px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.18);flex-shrink:0}
+.emic-filters button{flex:1;padding:7px 6px;border:1px solid var(--border);border-radius:8px;background:rgba(0,0,0,.25);color:#e8edf5;font-size:.72rem;font-weight:700;cursor:pointer}
+.emic-filters button.on{background:rgba(251,191,36,.22);border-color:#fbbf24;color:#fff}
+.data-table.emic-table td{vertical-align:top}
+.data-table.emic-table .addr{max-width:150px;white-space:normal;line-height:1.35}
+.new-item b{color:var(--green);font-size:.95rem}
+.new-item small,.img-item small{color:var(--muted);font-size:.78rem}
+.img-item a{color:var(--epcr);font-weight:600;text-decoration:none}
+.branch-item b{color:#fff}
+
+.data-table{width:100%;font-size:.86rem;border-collapse:collapse}
+.data-table th,.data-table td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--border);line-height:1.4}
+.data-table th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;letter-spacing:.03em;position:sticky;top:0;background:rgba(8,14,24,.98)}
+.data-table tbody tr:nth-child(even){background:rgba(255,255,255,.03)}
+.data-table tbody tr{cursor:pointer}
+.data-table tbody tr:hover{background:rgba(23,199,193,.1)}
+.data-table td.num{font-variant-numeric:tabular-nums;font-weight:600}
+
+.empty{padding:20px 16px;text-align:center;color:var(--muted);font-size:.88rem;line-height:1.5}
+.data-note{padding:8px 14px;font-size:.76rem;color:var(--muted);border-bottom:1px solid var(--border);line-height:1.45;background:rgba(23,199,193,.06)}
+.rt-badge{display:inline-block;font-size:.68rem;padding:1px 6px;border-radius:4px;margin-left:4px;vertical-align:middle;font-weight:600}
+.rt-badge.live{background:rgba(46,204,113,.2);color:var(--green)}
+.rt-badge.stale{background:rgba(255,193,7,.15);color:#ffc107}
+.status-pill{display:inline-block;font-size:.76rem;padding:4px 10px;border-radius:999px;font-weight:800;white-space:nowrap;line-height:1.2;border:1px solid transparent;letter-spacing:.02em}
+.status-pill.s5{background:#ca8a04;color:#fff;border-color:#fde68a;text-shadow:0 1px 1px rgba(0,0,0,.35)}
+.status-pill.s6{background:#ea580c;color:#fff;border-color:#fdba74;text-shadow:0 1px 1px rgba(0,0,0,.35)}
+.status-pill.s7{background:#2563eb;color:#fff;border-color:#93c5fd;text-shadow:0 1px 1px rgba(0,0,0,.35)}
+.status-pill.s8{background:#16a34a;color:#fff;border-color:#86efac;text-shadow:0 1px 1px rgba(0,0,0,.35)}
+.data-table.disp-table .status-pill{font-size:.8rem;padding:5px 11px}
+.disp-filters{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.22)}
+.disp-filters button{flex:1;min-width:62px;padding:7px 8px;border:1px solid var(--border);border-radius:8px;background:rgba(0,0,0,.25);color:#e8edf5;font-size:.74rem;font-weight:700;cursor:pointer;touch-action:manipulation}
+.data-table tbody tr,.new-item,.left-tab,.left-more-tab,.btn-sm,.btn-login,.tab,.close,.mobile-nav button{cursor:pointer;touch-action:manipulation}
+.disp-filters button.on{color:#fff}
+.disp-filters button[data-s=""].on{background:rgba(23,199,193,.25);border-color:var(--epcr)}
+.disp-filters button[data-s="5"].on{background:rgba(202,138,4,.38);border-color:#fde68a;color:#fff}
+.disp-filters button[data-s="6"].on{background:rgba(234,88,12,.35);border-color:#fdba74;color:#fff}
+.disp-filters button[data-s="7"].on{background:rgba(37,99,235,.35);border-color:#93c5fd;color:#fff}
+.disp-filters button[data-s="8"].on{background:rgba(22,163,74,.35);border-color:#86efac;color:#fff}
+.disp-filters button .sf-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;vertical-align:middle}
+.disp-filters button .sf-dot.s5{background:#fde68a}.disp-filters button .sf-dot.s6{background:#fdba74}
+.disp-filters button .sf-dot.s7{background:#93c5fd}.disp-filters button .sf-dot.s8{background:#86efac}
+.disp-filters button .n{opacity:.95;font-weight:900;margin-left:2px}
+.data-table tr.row-flash{animation:rowFlash 1.2s ease}
+.data-table tr.row-selected{background:rgba(23,199,193,.18)!important;outline:1px solid var(--epcr)}
+.data-table .addr{max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:.8rem}
+.data-table.disp-table{font-size:.92rem}
+.data-table.disp-table th{font-size:.8rem;padding:12px 10px}
+.data-table.disp-table td{padding:12px 10px}
+.data-table.disp-table td b{font-size:1rem;color:#fff}
+@keyframes rowFlash{0%,100%{background:transparent}40%{background:rgba(23,199,193,.28)}}
+.panel-disp-main{min-height:0}
+.addr-match{color:var(--green);font-weight:700}
+.addr-diff{color:var(--yellow);font-weight:700}
+.addr-warn{color:var(--red);font-weight:700}
+.leaflet-popup-content-wrapper{background:#0c121c;color:#e8edf5;border:1px solid var(--epcr);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.5)}
+.leaflet-popup-content{margin:12px 14px;font-size:.84rem;line-height:1.5;min-width:220px}
+.leaflet-popup-tip{background:#0c121c}
+.map-popup h4{margin:0 0 8px;color:var(--epcr);font-size:.95rem}
+.map-popup .addr-block{margin:8px 0;padding:8px 10px;background:rgba(0,0,0,.35);border-radius:8px;border-left:3px solid var(--epcr)}
+.map-popup .addr-block label{display:block;font-size:.7rem;color:var(--muted);margin-bottom:3px}
+.map-popup .addr-rev-block .pop-copy-addr{margin-top:8px;width:100%;padding:7px 10px;border-radius:6px;border:1px solid var(--green);background:rgba(34,197,94,.18);color:#fff;font-size:.76rem;font-weight:700;cursor:pointer}
+.map-popup .addr-rev-block .pop-copy-addr:disabled{opacity:.5;border-color:var(--border);background:rgba(0,0,0,.25);cursor:wait}
+.map-popup .addr-rev-block .pop-copy-addr.on:not(:disabled){border-color:var(--green)}
+.map-popup .nav-btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.map-popup .nav-btns a,.map-popup .nav-btns button{padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:rgba(23,199,193,.15);color:#fff;font-size:.74rem;text-decoration:none;cursor:pointer}
+.map-popup .nav-btns a:hover,.map-popup .nav-btns button:hover:not(:disabled){background:rgba(23,199,193,.3)}
+.map-popup .nav-btns button:disabled{opacity:.45;cursor:wait}
+.map-popup .nav-btns button.pop-copy-addr.on{background:rgba(34,197,94,.22);border-color:var(--green)}
+
+
+#videowall{position:fixed;inset:0;z-index:60;display:none;background:rgba(0,0,0,.94);backdrop-filter:blur(10px);flex-direction:column}
+#videowall.open{display:flex}
+#videowall .vw-head{padding:14px 20px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);font-size:1rem}
+#videowall .vw-grid{flex:1;overflow:auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;padding:16px}
+#videowall .vw-tile{background:var(--glass);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+#videowall .vw-tile h3{padding:10px 14px;font-size:.88rem;border-bottom:1px solid var(--border);color:var(--green)}
+#videowall video{width:100%;height:220px;background:#000;object-fit:contain}
+
+#modal{position:fixed;inset:0;z-index:50;display:none;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;padding-bottom:max(20px,env(safe-area-inset-bottom))}
+#modal.open{display:flex}
+.modal-box{background:#0c121c;border:1px solid var(--border);border-radius:16px;width:min(920px,100%);max-height:min(90vh,100dvh);overflow:auto;padding:22px}
+.modal-box h2{font-size:1.1rem;margin-bottom:14px;color:var(--epcr)}
+.close{float:right;cursor:pointer;color:var(--muted);font-size:1.1rem;padding:4px}
+.tabs{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.tab{padding:8px 14px;border-radius:8px;font-size:.84rem;cursor:pointer;border:1px solid var(--border)}
+.tab.on{background:var(--epcr);border-color:var(--epcr);color:#042a28;font-weight:700}
+video{width:100%;max-height:360px;background:#000;border-radius:10px}
+
+.alert-bar{position:fixed;top:56px;left:50%;transform:translateX(-50%);z-index:25;max-width:620px;width:min(94%,620px);pointer-events:none}
+.alert-bar .alert-item{pointer-events:auto}
+.alert-item{padding:12px 16px;margin-top:8px;border-radius:10px;font-size:.9rem;background:rgba(34,197,94,.18);border:1px solid var(--green);animation:slideIn .3s;line-height:1.55;color:#fff}
+.alert-item b{color:#fff;font-weight:800}
+.alert-item.status{background:rgba(37,99,235,.22);border-color:#60a5fa}
+.alert-item.status .status-pill{font-size:.74rem;padding:3px 9px;vertical-align:middle}
+.alert-item.new{background:rgba(34,197,94,.22);border-color:var(--green)}
+.alert-item.video{background:rgba(22,163,74,.28);border-color:#86efac}
+.alert-item .alert-arrow{margin:0 6px;color:#fde68a;font-weight:900}
+@keyframes slideIn{from{opacity:0;transform:translateY(-8px)}}
+.amb-pin{display:flex;flex-direction:column;align-items:center;transform:translateY(-4px)}
+.amb-marker{width:16px;height:16px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 12px rgba(0,0,0,.45)}
+.amb-marker.s5{background:#ca8a04}.amb-marker.s6{background:#ea580c}.amb-marker.s7{background:#2563eb}.amb-marker.s8{background:#16a34a}
+.amb-marker.stale{background:#6b7280;opacity:.55}
+.amb-label{margin-top:2px;padding:1px 6px;border-radius:4px;background:rgba(0,0,0,.72);color:#fff;font-size:10px;font-weight:700;white-space:nowrap;line-height:1.3}
+.map-legend{position:fixed;z-index:12;left:calc(var(--dock-left-w) + 14px);bottom:max(18px,env(safe-area-inset-bottom));background:rgba(8,14,24,.92);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:.76rem;line-height:1.55;pointer-events:none;color:#e8edf5;max-width:min(220px,calc(100vw - var(--dock-left-w) - var(--dock-right-w) - 28px))}
+.map-legend .emic-block{margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)}
+.map-legend .emic-block b{color:#fbbf24;font-size:.72rem}
+.map-legend .emic-src{font-size:.64rem;color:var(--muted);margin-top:4px;line-height:1.35}
+.emic-marker-wrap{position:relative;width:30px;height:30px}
+.emic-marker-wrap img{width:28px;height:28px;display:block;filter:drop-shadow(0 1px 3px rgba(0,0,0,.55))}
+.emic-marker-wrap .emic-badge{position:absolute;right:-2px;top:-4px;width:8px;height:8px;border-radius:50%;border:1px solid #fff}
+.emic-marker-wrap .emic-badge.on{background:#22c55e}.emic-marker-wrap .emic-badge.off{background:#9ca3af}
+.map-popup .emic-tag{display:inline-block;font-size:.68rem;padding:2px 8px;border-radius:999px;background:rgba(251,191,36,.2);color:#fbbf24;border:1px solid rgba(251,191,36,.45);margin-bottom:6px}
+.map-legend b{display:block;margin-bottom:4px;color:#fff}
+.map-legend .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle;border:1px solid rgba(255,255,255,.45)}
+.map-legend .lg-s5{color:#fde68a;font-weight:700}.map-legend .lg-s6{color:#fdba74;font-weight:700}
+.map-legend .lg-s7{color:#93c5fd;font-weight:700}.map-legend .lg-s8{color:#86efac;font-weight:700}
+.map-tools{position:fixed;z-index:35;right:calc(var(--dock-right-w) + 12px);bottom:max(72px,env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:6px;pointer-events:auto}
+.map-tools button{border:1px solid var(--border);background:rgba(8,14,24,.92);color:#fff;padding:8px 12px;border-radius:8px;font-size:.76rem;cursor:pointer;touch-action:manipulation}
+.map-tools button.on{background:rgba(23,199,193,.25);border-color:var(--epcr);color:var(--epcr)}
+.gps-fresh{color:var(--green)}.gps-stale{color:var(--muted)}
+
+.mobile-nav{display:none;position:fixed;left:0;right:0;bottom:0;z-index:40;height:64px;padding-bottom:env(safe-area-inset-bottom);background:rgba(6,10,16,.96);border-top:1px solid var(--border);backdrop-filter:blur(12px)}
+.mobile-nav button{flex:1;border:none;background:transparent;color:var(--muted);font-size:.72rem;padding:8px 4px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer}
+.mobile-nav button .glyphicon{font-size:1.1rem}
+.mobile-nav button.on{color:var(--epcr)}
+.mobile-sheet{transform:translateY(8px);opacity:0;transition:transform .25s ease,opacity .25s ease}
+.mobile-sheet.active{transform:translateY(0);opacity:1}
+.btn-login:disabled{opacity:.7;cursor:wait}
+#modal{transition:opacity .2s ease}
+#modal.open .modal-box{animation:modalIn .22s ease}
+@keyframes modalIn{from{opacity:0;transform:translateY(12px) scale(.98)}to{opacity:1;transform:none}}
+/* 平板 */
+@media(max-width:1100px){
+  :root{--dock-left-w:280px;--dock-right-w:360px}
+}
+
+/* 手機 */
+@media(max-width:768px){
+  #login{background-position:70% center}
+  .login-wrap{padding:20px;padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
+  .login-left{width:100%;max-width:360px}
+  .login-brand .title-zh{font-size:26px}
+  .topbar{height:52px;padding:0 14px}
+  .topbar .brand img{width:32px;height:32px}
+  .topbar h1{font-size:.88rem}
+  .topbar .meta{font-size:.72rem}
+  .chip{display:none}
+  .btn-sm{padding:8px 10px;font-size:.78rem}
+  .btn-sm .lbl{display:none}
+  .btn-sm .glyphicon{margin:0}
+
+  :root{--dock-left-w:0px;--dock-right-w:0px}
+  #map{top:52px;left:0;right:0;bottom:calc(64px + env(safe-area-inset-bottom));z-index:5}
+  .dock-left,.dock-right{display:none;position:fixed;inset:52px 0 calc(64px + env(safe-area-inset-bottom)) 0;width:auto;padding:10px;overflow:hidden;z-index:35;background:rgba(6,10,16,.95)}
+  .dock-left.active,.dock-right.active{display:flex;flex-direction:column}
+  .dock-left.active,.dock-right.active{animation:sheetIn .22s ease}
+  @keyframes sheetIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .dock-left .left-hub,.dock-right .panel{flex:1;min-height:0}
+  .dock-right{flex-direction:column}
+  .panel-emic-side{max-height:none;flex:1;min-height:160px}
+  .left-pane,.left-more-pane{max-height:none}
+  .panel-h{font-size:.92rem}
+  .stat-item .v{font-size:1.5rem}
+  .data-table{font-size:.84rem}
+  .data-table th,.data-table td{padding:10px}
+  .mobile-nav{display:flex}
+  .map-legend{left:10px;bottom:calc(70px + env(safe-area-inset-bottom));font-size:.68rem;padding:8px 10px}
+  .map-tools{right:10px;bottom:calc(124px + env(safe-area-inset-bottom))}
+  .alert-bar{top:52px;width:calc(100% - 20px);max-width:none}
+  #modal{padding:12px}
+  .modal-box{padding:16px;border-radius:14px}
+  #videowall .vw-grid{grid-template-columns:1fr;padding:12px}
+}
+
+@media(max-width:480px){
+  .login-wrap{padding:16px}
+  .login-brand .org{font-size:18px}
+  .login-brand .title-zh{font-size:22px}
+  .login-form .form-control{height:44px;font-size:16px}
+  .btn-login{font-size:17px;padding:12px}
+  .stat-grid{gap:8px;padding:12px}
+  .new-item,.evt-item,.img-item,.branch-item{font-size:.84rem;padding:12px 14px}
+}
+</style>
+</head>
+<body>
+<div id="login">
+  <div class="login-wrap">
+    <div class="login-left">
+      <div class="login-brand">
+        <div>
+          <img src="/images/bird50.png" alt="" class="bird">
+          <span class="org">新北市政府消防局</span>
+        </div>
+        <div class="title-zh"><div>智慧雲端</div><div>動態救護系統</div></div>
+        <div class="title-en">Smart Cloud Dynamic EMS System</div>
+      </div>
+      <form class="login-form" onsubmit="return false">
+        <div class="input-group input-group-lg">
+          <span class="input-group-addon"><span class="glyphicon glyphicon-lock"></span></span>
+          <input type="password" class="form-control" id="pwd" placeholder="輸入密碼" autocomplete="current-password">
+        </div>
+        <button type="button" class="btn-login" id="login-btn" onclick="doLogin()">登入</button>
+        <div class="login-err" id="login-err"></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div id="map"></div>
+<div class="map-legend" id="map-legend" style="display:none">
+  <b>救護車 GPS（E點通同源）</b>
+  <div><span class="dot" style="background:#ca8a04"></span><span class="lg-s5">已派遣</span></div>
+  <div><span class="dot" style="background:#ea580c"></span><span class="lg-s6">已出發</span></div>
+  <div><span class="dot" style="background:#2563eb"></span><span class="lg-s7">已到達</span></div>
+  <div><span class="dot" style="background:#16a34a"></span><span class="lg-s8">執行中(影像)</span></div>
+  <div><span class="dot" style="background:#6b7280"></span>逾時未更新</div>
+  <div class="emic-block" id="emic-legend" style="display:none">
+    <b>EMIC 災情對照</b>
+    <div><span class="dot" style="background:#22c55e"></span>處理中</div>
+    <div><span class="dot" style="background:#9ca3af"></span>已處理</div>
+    <div class="emic-src" id="emic-legend-note">新北市 · gis2.emic.gov.tw</div>
+  </div>
+</div>
+<div class="map-tools" id="map-tools" style="display:none">
+  <button type="button" id="gps-filter-live" class="on" onclick="setGpsFilter('live')">即時定位</button>
+  <button type="button" id="gps-filter-all" onclick="setGpsFilter('all')">全部車輛</button>
+  <button type="button" id="emic-toggle" onclick="toggleEmicLayer()">EMIC對照</button>
+  <button type="button" id="emic-filter-ntpc" class="on" style="display:none" onclick="setEmicFilter('ntpc')">新北</button>
+  <button type="button" id="emic-filter-active" style="display:none" onclick="setEmicFilter('active')">處理中</button>
+  <button type="button" onclick="recenterMap()">回到全區</button>
+</div>
+<div id="app" style="display:none">
+  <div class="topbar">
+    <div class="brand">
+      <img src="/images/bird50.png" alt="">
+      <div>
+        <h1>智慧雲端動態救護系統</h1>
+        <div class="meta" id="clock">—</div>
+      </div>
+    </div>
+    <div class="right">
+      <span class="chip live" id="status"><span class="glyphicon glyphicon-record"></span> 連線中</span>
+      <button class="btn-sm emic-top on" id="btn-emic-top" onclick="openEmicTab()"><span class="glyphicon glyphicon-warning-sign"></span><span class="lbl"> 災情</span><span class="emic-badge" id="emic-top-n">0</span></button>
+      <button class="btn-sm" onclick="toggleNotify()"><span class="glyphicon glyphicon-bell"></span><span class="lbl"> 通知</span></button>
+      <button class="btn-sm" onclick="showTab('video')"><span class="glyphicon glyphicon-facetime-video"></span><span class="lbl"> 影像</span></button>
+      <button class="btn-sm" onclick="location.href=R.logout"><span class="glyphicon glyphicon-log-out"></span><span class="lbl"> 登出</span></button>
+    </div>
+  </div>
+  <div class="alert-bar" id="alert-bar"></div>
+
+    <div class="dock-left" id="dock-left">
+      <div class="panel flex-1 left-hub" id="left-hub">
+        <div class="quick-strip" id="quick-strip"></div>
+        <div class="left-tabs">
+          <button type="button" class="left-tab on" data-pane="new" onclick="switchLeftTab(this)">新案 <span id="new-n">0</span></button>
+          <button type="button" class="left-tab emic-tab" data-pane="emic" onclick="switchLeftTab(this)">災情 <span class="emic-n" id="emic-n">0</span></button>
+          <button type="button" class="left-tab" data-pane="stats" onclick="switchLeftTab(this)">統計</button>
+          <button type="button" class="left-tab" data-pane="vitals" onclick="switchLeftTab(this)">徵象</button>
+          <button type="button" class="left-tab" data-pane="more" onclick="switchLeftTab(this)">更多</button>
+        </div>
+        <div class="left-pane on" id="left-pane-new">
+          <div id="new-list"><div class="empty">監控中…</div></div>
+        </div>
+        <div class="left-pane" id="left-pane-emic">
+          <div class="data-note" id="emic-note">EMIC 災情通報 KML · 與 EPCR 救護車對照</div>
+          <div class="emic-filters">
+            <button type="button" id="emic-ui-ntpc" class="on" onclick="setEmicFilter('ntpc')">新北市</button>
+            <button type="button" id="emic-ui-active" onclick="setEmicFilter('active')">處理中</button>
+            <button type="button" id="emic-ui-map" class="on" onclick="toggleEmicMap()">地圖顯示</button>
+          </div>
+          <div class="panel-b" id="emic-list-wrap">
+            <div id="emic-list"><div class="empty">載入 EMIC KML…</div></div>
+          </div>
+        </div>
+        <div class="left-pane" id="left-pane-stats">
+          <div class="section-pad">
+            <div class="section-title">E點通 KPI <span class="badge" id="edt-sync-badge" style="font-size:.68rem">8秒</span></div>
+            <div class="edt-kpi" id="edt-kpi"><div class="empty">載入中…</div></div>
+            <div class="edt-sync" id="edt-sync">GPS 同源 · 8秒輪詢</div>
+          </div>
+          <div class="section-pad" style="border-top:1px solid var(--border)">
+            <div class="section-title">即時概況</div>
+            <div class="stat-grid" id="stats"></div>
+          </div>
+        </div>
+        <div class="left-pane" id="left-pane-vitals">
+          <table class="data-table"><thead><tr><th>HR</th><th>SpO2</th><th>BP</th><th>前</th></tr></thead><tbody id="vit-tb"></tbody></table>
+        </div>
+        <div class="left-pane" id="left-pane-more">
+          <div class="left-more-tabs">
+            <button type="button" class="left-more-tab on" data-pane="events" onclick="switchMoreTab(this)">事件 <span id="evt-n">0</span></button>
+            <button type="button" class="left-more-tab" data-pane="images" onclick="switchMoreTab(this)">影像 <span id="img-n">0</span></button>
+            <button type="button" class="left-more-tab" data-pane="branches" onclick="switchMoreTab(this)">分隊 <span id="br-n">0</span></button>
+          </div>
+          <div class="left-more-pane on" id="pane-events"><div id="evt-list"><div class="empty">載入中…</div></div></div>
+          <div class="left-more-pane" id="pane-images"><div id="img-list"><div class="empty">載入中…</div></div></div>
+          <div class="left-more-pane" id="pane-branches"><div id="br-list"><div class="empty">載入中…</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dock-right" id="dock-right">
+      <div class="panel flex-1 panel-disp-main" id="panel-disp">
+        <div class="panel-h" style="font-size:1rem"><span><span class="glyphicon glyphicon-road"></span>即時派遣 · GPS</span> <span class="badge" id="disp-n">0</span></div>
+        <div class="data-note" id="disp-note">E點通同源 GPS · 點列反查完整地址 · 8秒更新</div>
+        <div class="disp-filters" id="disp-filters">
+          <button type="button" class="on" data-s="" onclick="setDispFilter(this,'')">全部 <span class="n" id="fc-all">0</span></button>
+          <button type="button" data-s="5" onclick="setDispFilter(this,'5')"><span class="sf-dot s5"></span>已派遣 <span class="n" id="fc-5">0</span></button>
+          <button type="button" data-s="6" onclick="setDispFilter(this,'6')"><span class="sf-dot s6"></span>已出發 <span class="n" id="fc-6">0</span></button>
+          <button type="button" data-s="7" onclick="setDispFilter(this,'7')"><span class="sf-dot s7"></span>已到達 <span class="n" id="fc-7">0</span></button>
+          <button type="button" data-s="8" onclick="setDispFilter(this,'8')"><span class="sf-dot s8"></span>影像中 <span class="n" id="fc-8">0</span></button>
+        </div>
+        <div class="panel-b"><table class="data-table disp-table"><thead><tr><th>車輛</th><th>狀態</th><th>派遣</th><th>GPS</th></tr></thead><tbody id="disp-tb"></tbody></table></div>
+      </div>
+      <div class="panel panel-emic-side" id="panel-emic">
+        <div class="panel-h"><span><span class="glyphicon glyphicon-map-marker"></span>EMIC 災情 KML</span> <span class="badge" id="emic-side-n">0</span></div>
+        <div class="emic-filters" style="padding:8px 10px">
+          <button type="button" id="emic-side-ntpc" class="on" onclick="setEmicFilter('ntpc')">新北</button>
+          <button type="button" id="emic-side-active" onclick="setEmicFilter('active')">處理中</button>
+        </div>
+        <div class="panel-b" id="emic-side-list"><div class="empty">載入 EMIC KML…</div></div>
+      </div>
+    </div>
+
+  <nav class="mobile-nav" id="mobile-nav">
+    <button type="button" class="on" data-view="map" onclick="switchMobileView('map')"><span class="glyphicon glyphicon-map-marker"></span>地圖</button>
+    <button type="button" data-view="left" onclick="switchMobileView('left')"><span class="glyphicon glyphicon-stats"></span>概況</button>
+    <button type="button" data-view="right" onclick="switchMobileView('right')"><span class="glyphicon glyphicon-road"></span>出勤</button>
+  </nav>
+</div>
+
+<div id="videowall">
+  <div class="vw-head">
+    <strong><span class="glyphicon glyphicon-facetime-video"></span> 即時影像監看牆</strong>
+    <button class="btn-sm" onclick="closeVideoWall()"><span class="glyphicon glyphicon-remove"></span> 關閉</button>
+  </div>
+  <div class="vw-grid" id="vw-grid"><div class="empty">載入中…</div></div>
+</div>
+
+<div id="modal">
+  <div class="modal-box">
+    <span class="close" onclick="closeModal()"><span class="glyphicon glyphicon-remove"></span></span>
+    <h2 id="modal-title">案件詳情</h2>
+    <div class="tabs">
+      <div class="tab on" data-t="vitals" onclick="switchTab(this)"><span class="glyphicon glyphicon-heart"></span> 生命徵象</div>
+      <div class="tab" data-t="events" onclick="switchTab(this)"><span class="glyphicon glyphicon-list-alt"></span> 事件</div>
+      <div class="tab" data-t="ecg" onclick="switchTab(this)"><span class="glyphicon glyphicon-signal"></span> 心電/AI</div>
+      <div class="tab" data-t="video" onclick="switchTab(this)"><span class="glyphicon glyphicon-facetime-video"></span> 即時影像</div>
+    </div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mpegts.js@1.7.3/dist/mpegts.js"></script>
+<script>
+const R = __ROUTES_JSON__;
+let map, markerLayer = null, notifyOn = false, modalData = null, flvPlayer = null, vwPlayers = [];
+let lastData = null, mobileView = 'map', pollTimer = null, mapFitted = false, userMovedMap = false;
+let renderCache = {}, scrollTops = {}, gpsFilter = 'live', markerIndex = {};
+let dispFilter = '', prevDispState = {}, selectedAmb = '', pollMs = 8000;
+let clickLayer = null, geoCache = {}, markerSig = {}, gpsByCode = {};
+let mapPausedUntil = 0, openPopupCode = '';
+let emicLayer = null, emicMapOn = true, emicNtpcOnly = true, emicActiveOnly = false;
+let emicData = null, emicTimer = null, emicMarkerIndex = {}, selectedEmicKey = '';
+const GEO_CACHE_MAX = 120;
+const EMIC_POLL_MS = 90000;
+const STATUS_CLS = {5:'s5',6:'s6',7:'s7',8:'s8'};
+const STATUS_LABEL = {5:'已派遣',6:'已出發',7:'已到達',8:'執行中(影像)'};
+const STATUS_ID_BY_NAME = {'已派遣':5,'已出發':6,'已到達':7,'執行中(有影像)':8,'執行中(影像)':8};
+
+function navUrls(lat, lng) {
+  const q = `${lat},${lng}`;
+  return {
+    google: `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(q)}`,
+    apple: `https://maps.apple.com/?daddr=${encodeURIComponent(q)}`,
+    osm: `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=17/${lat}/${lng}`,
+  };
+}
+function normAddr(s) {
+  if (!s) return '';
+  return String(s).replace(/\s+/g,'').replace(/臺/g,'台');
+}
+function compareAddr(aRaw, bRaw) {
+  const a = normAddr(aRaw), b = normAddr(bRaw);
+  if (!a && !b) return {cls:'', text:'—'};
+  if (!a || !b) return {cls:'addr-warn', text:'缺資料'};
+  if (a === b || a.includes(b) || b.includes(a)) return {cls:'addr-match', text:'✓ 一致'};
+  const pick = (t) => (t.match(/[新北台北基隆桃園][市縣]?[^區鄉鎮市]{0,6}[區鄉鎮市][^\d,，]{2,}/) || [])[0] || t.slice(0, 12);
+  const pa = pick(a), pb = pick(b);
+  if (pa && pb && (a.includes(pb.slice(-6)) || b.includes(pa.slice(-6)))) return {cls:'addr-match', text:'≈ 相近'};
+  return {cls:'addr-diff', text:'≠ 不同'};
+}
+function compareAddrLines(epcr, real, rev, nlsc) {
+  const lines = [];
+  const official = epcr || real;
+  if (official && rev) {
+    const c = compareAddr(official, rev);
+    lines.push(`EPCR ↔ 反查：${c.text}`);
+  }
+  if (rev && nlsc) {
+    const c = compareAddr(nlsc, rev);
+    lines.push(`NLSC ↔ 反查：${c.text}`);
+  }
+  if (!lines.length) return {cls:'addr-warn', html:'尚無可對照地址'};
+  const worst = lines.some(l => l.includes('不同')) ? 'addr-diff'
+    : lines.some(l => l.includes('缺')) ? 'addr-warn' : 'addr-match';
+  return {cls: worst, html: lines.join('<br>')};
+}
+async function reverseGeocode(lat, lng) {
+  if (!R.geocode) return {error: '未啟用'};
+  const key = `${Number(lat).toFixed(5)},${Number(lng).toFixed(5)}`;
+  if (geoCache[key]) return geoCache[key];
+  try {
+    const r = await fetch(R.geocode + '?lat=' + lat + '&lng=' + lng, {credentials:'same-origin', signal: AbortSignal.timeout(12000)});
+    const d = await r.json();
+    if (Object.keys(geoCache).length >= GEO_CACHE_MAX) delete geoCache[Object.keys(geoCache)[0]];
+    geoCache[key] = d;
+    return d;
+  } catch (e) { return {error: '反查失敗'}; }
+}
+function pauseMapRefresh(ms) { mapPausedUntil = Date.now() + (ms || 6000); }
+function navButtonsHtml(lat, lng) {
+  const u = navUrls(lat, lng);
+  return `<div class="nav-btns" data-lat="${lat}" data-lng="${lng}">
+    <a href="${u.google}" target="_blank" rel="noopener">Google 導航</a>
+    <a href="${u.apple}" target="_blank" rel="noopener">Apple 地圖</a>
+    <a href="${u.osm}" target="_blank" rel="noopener">OSM 檢視</a>
+    <button type="button" class="pop-copy-coords">複製座標</button>
+  </div>`;
+}
+function isCoordText(s) {
+  return /^-?\d+\.\d+\s*,\s*-?\d+\.\d+$/.test(String(s || '').trim());
+}
+function copyCoords(lat, lng) {
+  const t = Number(lat).toFixed(5) + ', ' + Number(lng).toFixed(5);
+  navigator.clipboard.writeText(t).catch(() => prompt('座標', t));
+}
+function pickFullAddress(g) {
+  if (!g || g.error) return '';
+  const a = String(g.fullAddress || g.display || '').trim();
+  if (!a || a === '—' || isCoordText(a) || a.includes('反查失敗') || a.includes('未啟用')) return '';
+  return a;
+}
+function getPopupFullAddr(div) {
+  if (div._fullAddr) return div._fullAddr;
+  const rev = div.querySelector('.pop-rev')?.textContent?.trim() || '';
+  if (rev && rev !== '—' && !isCoordText(rev) && !rev.includes('查詢中')) return rev;
+  return '';
+}
+function setCopyAddrBtn(div, g) {
+  const btn = div.querySelector('.pop-copy-addr');
+  if (!btn) return;
+  const addr = pickFullAddress(g);
+  div._fullAddr = addr || '';
+  if (addr) {
+    btn.disabled = false;
+    btn.classList.add('on');
+    btn.textContent = '複製完整地址';
+  } else {
+    btn.disabled = true;
+    btn.classList.remove('on');
+    btn.textContent = g?.error ? '無完整地址' : '反查中…';
+  }
+}
+function copyFullAddressFromPopup(div, btn) {
+  const t = getPopupFullAddr(div);
+  if (!t) {
+    btn.textContent = '尚無完整地址';
+    setTimeout(() => { btn.textContent = div._fullAddr ? '複製完整地址' : '反查中…'; }, 1200);
+    return;
+  }
+  const done = () => {
+    const old = '複製完整地址';
+    btn.textContent = '已複製 ✓';
+    setTimeout(() => { btn.textContent = old; }, 1200);
+  };
+  navigator.clipboard.writeText(t).then(done).catch(() => {
+    if (prompt('完整地址', t) != null) done();
+  });
+}
+function wirePopupActions(div, lat, lng) {
+  const nav = div.querySelector('.nav-btns');
+  const nlat = lat ?? Number(nav?.dataset?.lat);
+  const nlng = lng ?? Number(nav?.dataset?.lng);
+  nav?.querySelector('.pop-copy-coords')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!Number.isFinite(nlat) || !Number.isFinite(nlng)) return;
+    copyCoords(nlat, nlng);
+  });
+  div.querySelector('.pop-copy-addr')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    copyFullAddressFromPopup(div, e.currentTarget);
+  });
+}
+function applyGeocodeToPopup(div, g, extra) {
+  const rev = pickFullAddress(g) || g?.error || '—';
+  const el = div.querySelector('.pop-rev');
+  if (el) el.textContent = rev;
+  const nel = div.querySelector('.pop-nlsc');
+  if (nel) nel.textContent = g?.nlscSect || g?.nlsc || '—';
+  setCopyAddrBtn(div, g);
+  if (extra) extra(rev, g);
+}
+function esc(s) { return String(s||'').replace(/</g,''); }
+function buildAmbPopup(p) {
+  const div = document.createElement('div');
+  div.className = 'map-popup';
+  const ageCls = p.isStale ? 'gps-stale' : 'gps-fresh';
+  const epcrAddr = p.epcrAddress || '（無）';
+  const realAddr = (p.realAddress && p.realAddress !== p.epcrAddress) ? p.realAddress : '';
+  div.innerHTML = `<h4>${esc(p.ambulanceCode||'—')}</h4>
+    <div>${esc(p.licenseNo)} · ${esc(p.branch||'—')} · <b>${esc(p.statusName||'—')}</b></div>
+    <div>派遣 ${fmt(p.dispatchedAt)}${p.caseId ? ' · 案號 '+esc(p.caseId) : ''}</div>
+    <div class="addr-block"><label>E點通 GPS（同源）</label>
+      <div><span class="${ageCls}">${p.gpsAgeMin??'?'} 分前</span> · ${p.lat?.toFixed(5)}, ${p.lng?.toFixed(5)}</div></div>
+    <div class="addr-block"><label>EPCR 案件地址</label><div>${esc(epcrAddr)}</div></div>
+    ${realAddr ? `<div class="addr-block"><label>EPCR 實際地址</label><div>${esc(realAddr)}</div></div>` : ''}
+    <div class="addr-block addr-rev-block"><label>完整反查（Google）</label><div class="pop-rev">查詢中…</div>
+      <button type="button" class="pop-copy-addr" disabled>反查中…</button></div>
+    <div class="addr-block"><label>NLSC 行政區</label><div class="pop-nlsc">查詢中…</div></div>
+    <div class="pop-cmp" style="margin-top:6px;font-size:.78rem"></div>
+    ${navButtonsHtml(p.lat, p.lng)}`;
+  wirePopupActions(div, p.lat, p.lng);
+  if (p.lat != null && p.lng != null) {
+    reverseGeocode(p.lat, p.lng).then(g => {
+      applyGeocodeToPopup(div, g, (rev) => {
+        const cel = div.querySelector('.pop-cmp');
+        if (cel) {
+          const cmp = compareAddrLines(p.epcrAddress, p.realAddress, rev, g.nlsc || g.nlscSect);
+          cel.innerHTML = `<span class="${cmp.cls}">${cmp.html}</span>`;
+        }
+      });
+    }).catch(() => setCopyAddrBtn(div, {error: '反查失敗'}));
+  }
+  return div;
+}
+function buildClickPopup(lat, lng) {
+  const div = document.createElement('div');
+  div.className = 'map-popup';
+  div.innerHTML = `<h4>地圖點選位置</h4>
+    <div style="font-size:.78rem;color:var(--muted)">${lat.toFixed(5)}, ${lng.toFixed(5)}</div>
+    <div class="addr-block addr-rev-block"><label>完整反查（Google）</label><div class="pop-rev">查詢中…</div>
+      <button type="button" class="pop-copy-addr" disabled>反查中…</button></div>
+    <div class="addr-block"><label>NLSC 行政區</label><div class="pop-nlsc">查詢中…</div></div>
+    ${navButtonsHtml(lat, lng)}`;
+  wirePopupActions(div, lat, lng);
+  reverseGeocode(lat, lng).then(g => applyGeocodeToPopup(div, g))
+    .catch(() => setCopyAddrBtn(div, {error: '反查失敗'}));
+  return div;
+}
+function setDispFilter(btn, s) {
+  dispFilter = s;
+  document.querySelectorAll('.disp-filters button').forEach(b => b.classList.toggle('on', b === btn));
+  if (lastData) renderDispatchTable(lastData);
+}
+
+function statusPill(sid, name) {
+  const cls = STATUS_CLS[sid] || 's8';
+  const label = name || STATUS_LABEL[sid] || '—';
+  return `<span class="status-pill ${cls}">${label}</span>`;
+}
+function formatAlertHtml(a) {
+  const msg = a.msg || '';
+  const type = a.type || '';
+  let cls = 'alert-item';
+  if (type === 'status_change') cls += ' status';
+  else if (type === 'new_case' || type === 'new_vitals') cls += ' new';
+  else if (type === 'live_video') cls += ' video';
+
+  const m = msg.match(/^狀態變更\s+(.+?):\s+(.+?)\s*→\s*(.+)$/);
+  if (m) {
+    const code = m[1], fromName = m[2].trim(), toName = m[3].trim();
+    const fromId = STATUS_ID_BY_NAME[fromName], toId = STATUS_ID_BY_NAME[toName];
+    return `<div class="${cls}"><span class="glyphicon glyphicon-bell"></span> 狀態變更 <b>${code}</b> ` +
+      `${statusPill(fromId, fromName)}<span class="alert-arrow">→</span>${statusPill(toId, toName)}</div>`;
+  }
+  return `<div class="${cls}"><span class="glyphicon glyphicon-bell"></span> ${msg}</div>`;
+}
+
+function rowFlashClass(x) {
+  const key = x.uuid || x.ambulanceCode;
+  const sig = [x.statusId, x.gpsAgeMin, x.lat, x.lng].join('|');
+  const prev = prevDispState[key];
+  prevDispState[key] = sig;
+  return prev && prev !== sig ? ' row-flash' : '';
+}
+
+function pctBar(cls, pct, sub) {
+  const v = Math.max(0, Math.min(100, Number(pct) || 0));
+  return `<div class="edt-meter"><div class="row"><span>${sub}</span><span class="pct">${pct != null ? v + '%' : '—'}</span></div><div class="edt-bar ${cls}"><i style="width:${v}%"></i></div></div>`;
+}
+function renderEdtKpi(d) {
+  const k = d.edtKpi || {};
+  setText('edt-sync-badge', (d.pollInterval || 8) + '秒');
+  const syncEl = document.getElementById('edt-sync');
+  if (syncEl) syncEl.textContent = k.gpsNote ? (k.gpsNote + '（優於 E點通單次載入）') : 'GPS 同源 · 8秒輪詢';
+  const html = `
+    <div class="edt-today">
+      <div class="item"><div class="v">${k.caseSampleSize ?? '—'}</div><div class="l">今日案件</div></div>
+      <div class="item"><div class="v" style="font-size:.82rem">${k.avgReactionTime || '—'}</div><div class="l">平均反應</div></div>
+      <div class="item"><div class="v" style="font-size:.82rem">${k.avgWorkTime || '—'}</div><div class="l">平均作業</div></div>
+    </div>
+    ${pctBar('veh', k.vehicleUsagePct, `車輛使用率 ${k.ambulanceWorking ?? '—'}/${k.ambulanceSum ?? '—'}`)}
+    ${pctBar('br', k.branchUsagePct, `分隊使用率 ${k.branchWorking ?? '—'}/${k.branchSum ?? '—'}`)}
+    ${pctBar('avail', k.availability, `救護車妥善率 ${k.prCarUseSum != null ? k.prCarUseSum + '/' + (k.prCarSum ?? '—') + ' 可用' : ''}`)}
+  `;
+  setHtml('edt-kpi', html);
+}
+function renderEdtBranches(d) {
+  const brs = d.edtBranches || [];
+  setText('br-n', brs.length);
+  if (!brs.length) {
+    setHtml('br-list', '<div class="empty">無分隊資料</div>');
+    return;
+  }
+  setHtml('br-list', `<table class="branch-table"><thead><tr><th>分隊</th><th>行政區</th><th class="num">車輛</th><th class="num">執行</th></tr></thead><tbody>` +
+    brs.slice(0, 30).map(b => {
+      const hot = (b.dispatchSum || 0) > 0 ? ' class="hot"' : '';
+      return `<tr${hot}><td><b>${b.name||'—'}</b></td><td>${b.district||'—'}</td><td class="num">${b.ambulanceSum??'—'}</td><td class="num">${b.dispatchSum??0}</td></tr>`;
+    }).join('') + '</tbody></table>');
+}
+function renderDispatchTable(d) {
+  const s = d.summary || {};
+  const sc = d.statusCounts || {};
+  setText('disp-n', s.activeDispatches ?? (d.dispatches || []).length);
+  setText('fc-all', sc.all ?? s.activeDispatches ?? 0);
+  setText('fc-5', sc[5] ?? s.status5 ?? 0);
+  setText('fc-6', sc[6] ?? s.status6 ?? 0);
+  setText('fc-7', sc[7] ?? s.status7 ?? 0);
+  setText('fc-8', sc[8] ?? s.status8 ?? 0);
+  const note = d.dataNote || `派遣≤${d.filters?.dispatchMaxMin ?? 180}分 · GPS即時≤${d.filters?.gpsLiveMin ?? 30}分`;
+  setText('disp-note', note + ` · ${d.pollInterval || 8}秒更新`);
+
+  let list = d.liveUnits || d.dispatches || [];
+  if (dispFilter) list = list.filter(x => String(x.statusId) === dispFilter);
+
+  setHtml('disp-tb', list.length ? list.map(x => {
+    const gpsTxt = x.gpsAgeMin != null
+      ? (x.gpsLive ? `<span class="gps-fresh">${x.gpsAgeMin}分</span>` : `<span class="gps-stale">${x.gpsAgeMin}分</span>`)
+      : '—';
+    const dispT = x.dispatchedAt ? fmt(x.dispatchedAt) : (x.ageMin != null ? x.ageMin + '分' : '—');
+    const vid = x.hasLiveVideo ? ' <span class="glyphicon glyphicon-facetime-video" style="color:var(--epcr)"></span>' : '';
+    const sel = selectedAmb && selectedAmb === x.ambulanceCode ? ' row-selected' : '';
+    const addrHint = (x.epcrAddress || x.realAddress)
+      ? `<br><small class="addr" title="${esc(x.epcrAddress||x.realAddress)}">${esc((x.epcrAddress||x.realAddress).slice(0,18))}</small>`
+      : (x.lat ? '<br><small class="addr" title="點擊反查完整地址">📍 可反查</small>' : '');
+    return `<tr class="${rowFlashClass(x)}${sel}" data-code="${esc(x.ambulanceCode||'')}" data-uuid="${esc(x.uuid||'')}" onclick="selectAmbulance('${(x.ambulanceCode||'').replace(/'/g,"\\'")}','${x.uuid||''}')">` +
+      `<td><b>${x.ambulanceCode||'—'}</b>${vid}<br><small style="color:var(--muted)">${x.branch||'—'}</small>${addrHint}</td>` +
+      `<td>${statusPill(x.statusId, x.statusName)}</td>` +
+      `<td class="num">${dispT}</td>` +
+      `<td>${gpsTxt}</td></tr>`;
+  }).join('') : '<tr><td colspan="4" class="empty">目前無即時派遣</td></tr>');
+}
+
+function selectAmbulance(code, uuid) {
+  if (!code) return;
+  selectedAmb = code;
+  openPopupCode = code;
+  pauseMapRefresh(8000);
+  switchMobileView('map');
+  const m = markerIndex[code];
+  if (m) {
+    map.flyTo(m.getLatLng(), Math.max(map.getZoom(), 15), {duration: 0.35});
+    m.openPopup();
+  }
+  highlightDispRow();
+}
+function highlightDispRow() {
+  document.querySelectorAll('#disp-tb tr').forEach(tr => {
+    tr.classList.toggle('row-selected', tr.dataset.code === selectedAmb);
+  });
+}
+
+function setGpsFilter(mode) {
+  gpsFilter = mode;
+  document.getElementById('gps-filter-live').classList.toggle('on', mode === 'live');
+  document.getElementById('gps-filter-all').classList.toggle('on', mode === 'all');
+  if (lastData) updateMap(lastData.gps);
+}
+function recenterMap() {
+  userMovedMap = false;
+  mapFitted = false;
+  if (lastData) updateMap(lastData.gps, true);
+}
+
+function emicIcon(c) {
+  const active = c.isActive;
+  const src = c.icon || '';
+  const html = src
+    ? `<div class="emic-marker-wrap"><img src="${esc(src)}" alt=""><span class="emic-badge ${active ? 'on' : 'off'}"></span></div>`
+    : `<div class="emic-marker-wrap"><div class="amb-marker ${active ? 's8' : 'stale'}" style="width:14px;height:14px;margin:7px"></div></div>`;
+  return L.divIcon({className: '', html, iconSize: [30, 30], iconAnchor: [15, 15]});
+}
+
+function buildEmicPopup(c) {
+  const near = findNearestAmbulance(c.lat, c.lng);
+  const nearHtml = near
+    ? `<div style="margin-top:8px;padding:8px;background:rgba(23,199,193,.12);border-radius:8px;font-size:.76rem">
+        <b>EPCR 最近車輛</b><br>${esc(near.code)} · ${esc(near.statusName || '')}<br>約 ${near.km} km
+       </div>`
+    : '';
+  return `<div class="map-popup">
+    <span class="emic-tag">EMIC 災情通報</span>
+    <h4>${esc(c.category || c.name)} · ${esc(c.status || '—')}</h4>
+    <div class="addr-block"><label>案件地點</label>${esc(c.address || '—')}</div>
+    <div style="font-size:.76rem;color:var(--muted);margin-top:6px">
+      次要類別：${esc(c.subCategory || '—')}<br>
+      報案時間：${esc(c.reportTime || '—')}
+    </div>
+    ${nearHtml}
+    <div class="nav-btns">${navButtonsHtml(c.lat, c.lng)}</div>
+  </div>`;
+}
+
+function findNearestAmbulance(lat, lng) {
+  const list = (lastData && lastData.gps) ? lastData.gps.filter(p => p.lat && p.lng) : [];
+  let best = null, bestD = Infinity;
+  list.forEach(p => {
+    const d = haversineKm(lat, lng, p.lat, p.lng);
+    if (d < bestD) { bestD = d; best = p; }
+  });
+  if (!best || bestD > 80) return null;
+  return {
+    code: best.ambulanceCode,
+    statusName: best.statusName,
+    km: bestD < 1 ? bestD.toFixed(2) : bestD.toFixed(1),
+  };
+}
+
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371, toR = Math.PI / 180;
+  const dLat = (lat2 - lat1) * toR, dLng = (lng2 - lng1) * toR;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * toR) * Math.cos(lat2 * toR) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function emicQuery() {
+  const q = new URLSearchParams();
+  if (emicNtpcOnly) q.set('ntpc', '1'); else q.set('ntpc', '0');
+  if (emicActiveOnly) q.set('active', '1');
+  return q.toString();
+}
+
+function emicCaseKey(c, i) {
+  return `${c.lat}|${c.lng}|${c.reportTime || i}`;
+}
+
+function emicStatusPill(c) {
+  const cls = c.isActive ? 's8' : 's5';
+  return `<span class="status-pill ${cls}">${esc(c.status || '—')}</span>`;
+}
+
+function syncEmicFilterUi() {
+  ['emic-ui-ntpc', 'emic-filter-ntpc', 'emic-side-ntpc'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('on', emicNtpcOnly);
+  });
+  ['emic-ui-active', 'emic-filter-active', 'emic-side-active'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('on', emicActiveOnly);
+  });
+  const uiMap = document.getElementById('emic-ui-map');
+  if (uiMap) uiMap.classList.toggle('on', emicMapOn);
+}
+
+function updateEmicLegend(sum) {
+  const note = document.getElementById('emic-legend-note');
+  if (!note || !sum) return;
+  const parts = [];
+  if (emicNtpcOnly) parts.push('新北市');
+  if (emicActiveOnly) parts.push('處理中');
+  const filt = parts.length ? parts.join(' · ') : '全國';
+  note.textContent = `${filt} · 顯示 ${sum.shown || 0} 件（全國 ${sum.total || 0}）`;
+}
+
+function updateEmicMapButton(d) {
+  const btn = document.getElementById('emic-toggle');
+  if (!btn) return;
+  const n = d?.summary?.shown || 0;
+  btn.textContent = emicMapOn ? `EMIC ${n}` : 'EMIC對照';
+  btn.classList.toggle('on', emicMapOn);
+}
+
+function renderEmicListHtml(cases) {
+  if (!cases.length) return '<div class="empty">目前篩選條件下無 EMIC 通報</div>';
+  return cases.map((c, i) => {
+    const key = emicCaseKey(c, i);
+    const near = findNearestAmbulance(c.lat, c.lng);
+    const nearTxt = near ? `<span class="emic-near">${esc(near.code)} · ${near.km}km</span>` : '<span>—</span>';
+    return `<div class="emic-item${selectedEmicKey === key ? ' on' : ''}" data-emic-key="${esc(key)}" onclick="selectEmicCase('${esc(key)}')">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <span class="emic-cat">${esc(c.category || c.name)}</span>
+        ${emicStatusPill(c)}
+      </div>
+      <div class="emic-addr">${esc(c.address || '—')}</div>
+      <div class="emic-meta"><span>${esc(c.reportTime || '—')}</span>${nearTxt}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderEmicPanel(data) {
+  const cases = data.cases || [];
+  const sum = data.summary || {};
+  const n = sum.shown || 0;
+  setText('emic-n', n);
+  setText('emic-side-n', n);
+  setText('emic-top-n', sum.ntpcActive ?? n);
+  const note = document.getElementById('emic-note');
+  if (note) {
+    const activeNtpc = sum.ntpcActive != null ? sum.ntpcActive : '—';
+    note.textContent = `EMIC KML · 新北處理中 ${activeNtpc} 件 · 全國 ${sum.total || 0} 件 · 90秒更新`;
+  }
+  const html = renderEmicListHtml(cases);
+  setHtml('emic-list', html);
+  setHtml('emic-side-list', html);
+  highlightEmicRow();
+}
+
+function renderEmicLayer(data) {
+  if (!emicLayer || !emicMapOn) {
+    if (emicLayer) emicLayer.clearLayers();
+    emicMarkerIndex = {};
+    return;
+  }
+  const cases = data.cases || [];
+  const seen = new Set();
+  cases.forEach((c, i) => {
+    if (!c.lat || !c.lng) return;
+    const key = emicCaseKey(c, i);
+    seen.add(key);
+    const sig = [c.lat, c.lng, c.status, c.icon].join('|');
+    let m = emicMarkerIndex[key];
+    if (m && m._emicSig === sig) return;
+    if (m) emicLayer.removeLayer(m);
+    m = L.marker([c.lat, c.lng], {icon: emicIcon(c), zIndexOffset: 200});
+    m._emicSig = sig;
+    m._emicKey = key;
+    m.bindPopup(buildEmicPopup(c), {maxWidth: 320});
+    m.on('click', () => { selectedEmicKey = key; highlightEmicRow(); pauseMapRefresh(8000); });
+    emicLayer.addLayer(m);
+    emicMarkerIndex[key] = m;
+  });
+  Object.keys(emicMarkerIndex).forEach(key => {
+    if (seen.has(key)) return;
+    emicLayer.removeLayer(emicMarkerIndex[key]);
+    delete emicMarkerIndex[key];
+  });
+  const leg = document.getElementById('emic-legend');
+  if (leg) leg.style.display = emicMapOn ? 'block' : 'none';
+  updateEmicLegend(data.summary);
+}
+
+function highlightEmicRow() {
+  document.querySelectorAll('.emic-item').forEach(el => {
+    el.classList.toggle('on', el.dataset.emicKey === selectedEmicKey);
+  });
+}
+
+function selectEmicCase(key) {
+  if (!key) return;
+  selectedEmicKey = key;
+  highlightEmicRow();
+  pauseMapRefresh(10000);
+  if (!emicMapOn) toggleEmicMap(true);
+  const m = emicMarkerIndex[key];
+  if (m) {
+    switchMobileView('map');
+    map.flyTo(m.getLatLng(), Math.max(map.getZoom(), 15), {duration: 0.35});
+    m.openPopup();
+    return;
+  }
+  const hit = (emicData?.cases || []).find((c, i) => emicCaseKey(c, i) === key);
+  if (hit && hit.lat && hit.lng) {
+    switchMobileView('map');
+    map.flyTo([hit.lat, hit.lng], Math.max(map.getZoom(), 15), {duration: 0.35});
+  }
+}
+
+async function fetchEmicData() {
+  if (!R.emicKml) return;
+  try {
+    const d = await fetch(R.emicKml + '?' + emicQuery() + '&' + Date.now(), {credentials: 'same-origin'}).then(r => r.json());
+    if (d.error) throw new Error(d.error);
+    emicData = d;
+    renderEmicPanel(d);
+    renderEmicLayer(d);
+    updateEmicMapButton(d);
+    const qStrip = document.getElementById('quick-emic');
+    if (qStrip) qStrip.textContent = d.summary?.ntpcActive ?? (d.summary?.shown || 0);
+  } catch (e) {
+    setHtml('emic-list', '<div class="empty">EMIC KML 載入失敗，稍後重試</div>');
+    const btn = document.getElementById('emic-toggle');
+    if (btn) btn.textContent = 'EMIC失敗';
+  }
+}
+
+function setEmicFilter(mode) {
+  if (mode === 'ntpc') emicNtpcOnly = !emicNtpcOnly;
+  else if (mode === 'active') emicActiveOnly = !emicActiveOnly;
+  syncEmicFilterUi();
+  fetchEmicData();
+}
+
+function toggleEmicMap(forceOn) {
+  emicMapOn = typeof forceOn === 'boolean' ? forceOn : !emicMapOn;
+  syncEmicFilterUi();
+  const fNtpc = document.getElementById('emic-filter-ntpc');
+  const fActive = document.getElementById('emic-filter-active');
+  if (fNtpc) fNtpc.style.display = emicMapOn ? 'block' : 'none';
+  if (fActive) fActive.style.display = emicMapOn ? 'block' : 'none';
+  if (emicData) {
+    renderEmicLayer(emicData);
+    updateEmicMapButton(emicData);
+  } else if (!emicMapOn && emicLayer) {
+    emicLayer.clearLayers();
+    emicMarkerIndex = {};
+    document.getElementById('emic-legend').style.display = 'none';
+  }
+}
+
+async function toggleEmicLayer() {
+  toggleEmicMap();
+}
+
+function startEmicPolling() {
+  fetchEmicData();
+  if (emicTimer) clearInterval(emicTimer);
+  emicTimer = setInterval(fetchEmicData, EMIC_POLL_MS);
+}
+
+function scrollParent(el) {
+  return el?.closest('.left-pane') || el?.closest('.left-more-pane') || el?.closest('.panel-b') || el;
+}
+function saveScroll() {
+  ['new-list','emic-list','emic-side-list','disp-tb','vit-tb','evt-list','img-list','br-list'].forEach(id => {
+    const el = document.getElementById(id);
+    const scroller = scrollParent(el);
+    if (scroller) scrollTops[id] = scroller.scrollTop;
+  });
+}
+function restoreScroll() {
+  requestAnimationFrame(() => {
+    ['new-list','disp-tb','vit-tb','evt-list','img-list','br-list'].forEach(id => {
+      const el = document.getElementById(id);
+      const scroller = scrollParent(el);
+      if (scroller && scrollTops[id] != null) scroller.scrollTop = scrollTops[id];
+    });
+  });
+}
+function switchLeftTab(btn) {
+  document.querySelectorAll('.left-tab').forEach(t => t.classList.remove('on'));
+  document.querySelectorAll('.left-pane').forEach(p => p.classList.remove('on'));
+  btn.classList.add('on');
+  const pane = document.getElementById('left-pane-' + btn.dataset.pane);
+  if (pane) pane.classList.add('on');
+  if (btn.dataset.pane === 'emic' && !emicData) fetchEmicData();
+}
+function switchMoreTab(btn) {
+  document.querySelectorAll('.left-more-tab').forEach(t => t.classList.remove('on'));
+  document.querySelectorAll('.left-more-pane').forEach(p => p.classList.remove('on'));
+  btn.classList.add('on');
+  document.getElementById('pane-' + btn.dataset.pane)?.classList.add('on');
+}
+function renderQuickStrip(s) {
+  const emicN = emicData?.summary?.ntpcActive ?? emicData?.summary?.shown ?? '—';
+  setHtml('quick-strip', [
+    ['出勤', s.activeDispatches ?? 0, true, ''],
+    ['GPS', s.gpsLive ?? 0, true, ''],
+    ['新案', s.newCasesThisPoll ?? 0, true, ''],
+    ['災情', emicN, !!emicData?.summary?.ntpcActive, 'quick-emic'],
+  ].map(([l,v,hot,id]) => `<div class="q" onclick="${id==='quick-emic'?'openEmicTab()':''}" style="${id==='quick-emic'?'cursor:pointer':''}"><div class="qv${hot?' hot':''}"${id?` id="${id}"`:''}>${v??0}</div><div class="ql">${l}</div></div>`).join(''));
+}
+
+function openEmicTab() {
+  const tab = document.querySelector('.left-tab[data-pane="emic"]');
+  if (tab) switchLeftTab(tab);
+  switchMobileView('left');
+  const side = document.getElementById('panel-emic');
+  if (side) side.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+}
+function setHtml(id, html) {
+  if (renderCache[id] === html) return false;
+  renderCache[id] = html;
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = html;
+  return true;
+}
+function setText(id, text) {
+  const el = document.getElementById(id);
+  if (el && el.textContent !== String(text)) el.textContent = text;
+}
+
+function switchMobileView(view) {
+  mobileView = view;
+  document.querySelectorAll('.mobile-nav button').forEach(b => b.classList.toggle('on', b.dataset.view === view));
+  ['dock-left','dock-right'].forEach(id => document.getElementById(id).classList.remove('active'));
+  if (view === 'left') document.getElementById('dock-left').classList.add('active');
+  if (view === 'right') document.getElementById('dock-right').classList.add('active');
+  if (view === 'map') requestAnimationFrame(() => map.invalidateSize());
+}
+
+map = L.map('map', {zoomControl:false, preferCanvas:true}).setView([25.033, 121.565], 11);
+// 國土測繪中心 EMAP — 台灣繁體中文地名
+L.tileLayer('https://wmts.nlsc.gov.tw/wmts/EMAP/default/GoogleMapsCompatible/{z}/{y}/{x}.png', {
+  maxZoom: 18,
+  minZoom: 8,
+  updateWhenIdle: true,
+  updateWhenZooming: false,
+  attribution: '&copy; <a href="https://maps.nlsc.gov.tw/" target="_blank" rel="noopener">國土測繪中心</a>',
+}).addTo(map);
+L.control.zoom({position:'bottomright'}).addTo(map);
+markerLayer = L.layerGroup().addTo(map);
+emicLayer = L.layerGroup().addTo(map);
+clickLayer = L.layerGroup().addTo(map);
+map.on('dragstart zoomstart', () => { userMovedMap = true; });
+map.on('click', (e) => {
+  pauseMapRefresh(6000);
+  const lat = e.latlng.lat, lng = e.latlng.lng;
+  clickLayer.clearLayers();
+  const pin = L.marker([lat, lng], {icon: L.divIcon({className:'', html:'<div class="amb-marker s7" style="width:14px;height:14px;box-shadow:0 0 10px #42a5f5"></div>', iconSize:[14,14], iconAnchor:[7,7]})});
+  pin.bindPopup(buildClickPopup(lat, lng), {maxWidth: 300}).openPopup();
+  clickLayer.addLayer(pin);
+});
+
+function showDashboard() {
+  document.getElementById('login').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('map-legend').style.display = 'block';
+  document.getElementById('map-tools').style.display = 'flex';
+  const leg = document.getElementById('emic-legend');
+  if (leg) leg.style.display = emicMapOn ? 'block' : 'none';
+  const fNtpc = document.getElementById('emic-filter-ntpc');
+  const fActive = document.getElementById('emic-filter-active');
+  if (fNtpc) fNtpc.style.display = emicMapOn ? 'block' : 'none';
+  if (fActive) fActive.style.display = emicMapOn ? 'block' : 'none';
+}
+
+function showLogin(msg) {
+  document.getElementById('login').style.display = 'block';
+  document.getElementById('app').style.display = 'none';
+  if (msg) document.getElementById('login-err').textContent = msg;
+}
+
+async function probeSession() {
+  const r = await fetch(R.session + '?' + Date.now(), {credentials: 'same-origin'});
+  if (!r.ok) return false;
+  const d = await r.json();
+  return !!d.authed;
+}
+
+async function doLogin() {
+  const errEl = document.getElementById('login-err');
+  const btn = document.getElementById('login-btn');
+  const pwd = document.getElementById('pwd').value.trim();
+  errEl.textContent = '';
+  if (!pwd) { errEl.textContent = '請輸入密碼'; return; }
+  btn.disabled = true;
+  btn.textContent = '登入中…';
+  try {
+    const r = await fetch(R.login, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({password: pwd}),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      errEl.textContent = '';
+      showDashboard();
+      start();
+    } else {
+      errEl.textContent = d.error || '密碼錯誤';
+    }
+  } catch (e) {
+    errEl.textContent = '連線失敗，請稍後再試';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '登入';
+  }
+}
+document.getElementById('pwd').addEventListener('keydown', e => { if (e.key==='Enter') doLogin(); });
+
+async function sync() {
+  const r = await fetch(R.sync + '?' + Date.now(), {credentials:'same-origin', signal: AbortSignal.timeout(15000)});
+  const d = await r.json();
+  if (!r.ok || d.error === 'unauthorized' || d.authed === false) {
+    showLogin('登入已過期，請重新輸入密碼');
+    return null;
+  }
+  return d;
+}
+
+function fmt(iso) { return iso ? new Date(iso).toLocaleTimeString('zh-TW',{hour12:false}) : '—'; }
+
+function ambIcon(p) {
+  const stale = p.isStale ? ' stale' : '';
+  const cls = p.isStale ? 'stale' : (STATUS_CLS[p.statusId] || 's8');
+  const code = (p.ambulanceCode || '—').replace(/</g,'');
+  return L.divIcon({
+    className: '',
+    html: `<div class="amb-pin"><div class="amb-marker ${cls}${stale}"></div><div class="amb-label">${code}</div></div>`,
+    iconSize: [48, 36],
+    iconAnchor: [24, 18],
+  });
+}
+
+function markerSignature(p) {
+  return [p.lat, p.lng, p.statusId, p.isStale, p.ambulanceCode].join('|');
+}
+function updateMap(gpsList, forceFit) {
+  if (Date.now() < mapPausedUntil && !forceFit) return;
+  const list = (gpsList || []).filter(p => gpsFilter === 'all' ? true : p.isLive);
+  const seen = new Set();
+  const bounds = [];
+  list.forEach(p => {
+    if (!p.lat || !p.lng || !p.ambulanceCode) return;
+    const code = p.ambulanceCode;
+    seen.add(code);
+    gpsByCode[code] = p;
+    const sig = markerSignature(p);
+    const sel = selectedAmb === code;
+    let m = markerIndex[code];
+    if (m && markerSig[code] === sig) {
+      m.setZIndexOffset(sel ? 500 : 0);
+      bounds.push([p.lat, p.lng]);
+      return;
+    }
+    if (m) {
+      m._ambCode = code;
+      m.setLatLng([p.lat, p.lng]);
+      m.setIcon(ambIcon(p));
+      m.setZIndexOffset(sel ? 500 : 0);
+    } else {
+      m = L.marker([p.lat, p.lng], {icon: ambIcon(p), zIndexOffset: sel ? 500 : 0}).addTo(markerLayer);
+      m._ambCode = code;
+      m.bindPopup(() => buildAmbPopup(gpsByCode[code] || p), {maxWidth: 300});
+      m.on('click', () => selectAmbulance(code, p.uuid));
+      markerIndex[code] = m;
+    }
+    markerSig[code] = sig;
+    bounds.push([p.lat, p.lng]);
+  });
+  Object.keys(markerIndex).forEach(code => {
+    if (seen.has(code)) return;
+    markerLayer.removeLayer(markerIndex[code]);
+    delete markerIndex[code];
+    delete markerSig[code];
+    delete gpsByCode[code];
+    if (openPopupCode === code) openPopupCode = '';
+  });
+  if ((forceFit || (!mapFitted && !userMovedMap)) && bounds.length) {
+    const pad = window.innerWidth < 768 ? [60, 60] : [150, 150];
+    map.fitBounds(bounds, {padding: pad, maxZoom: gpsFilter === 'live' ? 14 : 12, animate: !userMovedMap, duration: 0.35});
+    mapFitted = true;
+  }
+}
+
+function render(d) {
+  saveScroll();
+  const s = d.summary || {};
+  setText('clock', '更新 ' + fmt(d.updatedAt));
+  const st = document.getElementById('status');
+  if (st) {
+    if (d.tokenOk === false) {
+      st.className = 'chip';
+      st.innerHTML = '<span class="glyphicon glyphicon-warning-sign"></span> EPCR Token 失效';
+    } else {
+      st.className = 'chip live';
+      st.innerHTML = '<span class="glyphicon glyphicon-record"></span> 即時監控中';
+    }
+  }
+
+  renderQuickStrip(s);
+  renderEdtKpi(d);
+  setHtml('stats', [
+    ['即時出勤', s.activeDispatches ?? 0, true],
+    ['即時GPS', s.gpsLive ?? 0, true],
+    ['新案件', s.newCasesThisPoll, true],
+    ['即時影像', s.liveVideoCases],
+  ].map(([l,v,hot]) => `<div class="stat-item"><div class="v${hot?' hot':''}">${v??0}</div><div class="l">${l}</div></div>`).join(''));
+
+  const nc = (d.newCases||[]).length;
+  setText('new-n', nc);
+  setHtml('new-list', nc
+    ? d.newCases.map(c => `<div class="new-item" onclick="openCase('${c.uuid||c.recordUuid}')"><b>${c.ambulanceCode||'新案件'}</b> ${c.branch||''}<br><small>${c.statusName||'生命徵象'} · ${c.ageMin??'?'}分鐘前</small></div>`).join('')
+    : '<div class="empty">持續監控中，尚無新案件</div>');
+
+  const alertsHtml = (d.alerts && d.alerts.length)
+    ? d.alerts.slice(0,2).map(a => formatAlertHtml(a)).join('')
+    : '';
+  setHtml('alert-bar', alertsHtml);
+
+  renderDispatchTable(d);
+
+  setHtml('vit-tb', (d.vitals||[]).slice(0,8).map(v =>
+    `<tr onclick="openCase('${v.recordUuid}')"><td class="num">${v.hr??'—'}</td><td class="num">${v.spo2??'—'}</td><td class="num">${v.NBPm??'—'}</td><td>${v.ageMin}分</td></tr>`
+  ).join('') || '<tr><td colspan="4" class="empty">無資料</td></tr>');
+
+  if (d.gps) d.gps.forEach(p => { if (p.ambulanceCode) gpsByCode[p.ambulanceCode] = p; });
+  updateMap(d.gps);
+  lastData = d;
+  if (d.pollInterval) pollMs = Math.max(8000, Number(d.pollInterval) * 1000);
+
+  const evts = d.events || [];
+  setText('evt-n', evts.length);
+  setHtml('evt-list', evts.length
+    ? evts.slice(0,10).map(e => `<div class="evt-item">${fmt(e.Timestamp||e.createdAt)} · ${e.EventType||e.type||'事件'}</div>`).join('')
+    : '<div class="empty">尚無事件</div>');
+
+  const imgs = d.images || [];
+  setText('img-n', imgs.length);
+  setHtml('img-list', imgs.length
+    ? imgs.slice(0,8).map(i => `<div class="img-item" onclick="openCase('${i.recordUuid||''}')"><a href="${i.download||'#'}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${i.fileName||'影像'}</a><br><small>${fmt(i.createdAt)}</small></div>`).join('')
+    : '<div class="empty">尚無影像</div>');
+
+  renderEdtBranches(d);
+
+  restoreScroll();
+  if (document.getElementById('videowall').classList.contains('open')) renderVideoWall(d);
+}
+
+async function openCase(id) {
+  if (!id) return;
+  document.getElementById('modal').classList.add('open');
+  document.getElementById('modal-title').textContent = '案件 ' + id.slice(0,8) + '…';
+  document.getElementById('modal-body').innerHTML = '載入中…';
+  modalData = await fetch(R.case + '?id=' + id, {credentials:'same-origin'}).then(r=>r.json());
+  switchTab(document.querySelector('.tab[data-t=vitals]'));
+}
+
+function switchTab(el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
+  el.classList.add('on');
+  const t = el.dataset.t;
+  const d = modalData || {};
+  const body = document.getElementById('modal-body');
+  if (flvPlayer) { try{flvPlayer.destroy()}catch(e){} flvPlayer=null; }
+
+  if (t==='vitals') {
+    body.innerHTML = '<table class="data-table"><thead><tr><th>時間</th><th>HR</th><th>SpO2</th><th>BP</th></tr></thead><tbody>' +
+      (d.trendings||[]).slice(0,20).map(x => `<tr><td>${fmt(x.createdAt)}</td><td class="num">${x.hr??'—'}</td><td class="num">${x.spo2??'—'}</td><td class="num">${x.NBPm??'—'}</td></tr>`).join('') + '</tbody></table>';
+  } else if (t==='events') {
+    body.innerHTML = '<ul>' + (d.events||[]).slice(0,15).map(e => `<li>${fmt(e.Timestamp||e.createdAt)} ${e.EventType||''}</li>`).join('') + '</ul>';
+  } else if (t==='ecg') {
+    body.innerHTML = (d.aiEcg||[]).map(r => `<p>${JSON.stringify(r).slice(0,200)}</p>`).join('') ||
+      (d.images||[]).map(i => `<p><a href="${i.url}" target="_blank" rel="noopener">${i.fileName||'影像'}</a></p>`).join('');
+  } else if (t==='video') {
+    body.innerHTML = '<video id="mv" controls muted autoplay></video>';
+    if (d.streamUrl && mpegts.getFeatureList().mseLivePlayback) {
+      flvPlayer = mpegts.createPlayer({type:'mse', isLive:true, url:d.streamUrl});
+      flvPlayer.attachMediaElement(document.getElementById('mv'));
+      flvPlayer.load(); flvPlayer.play().catch(()=>{});
+    }
+  }
+}
+
+function closeModal() { document.getElementById('modal').classList.remove('open'); if(flvPlayer){try{flvPlayer.destroy()}catch(e){}} }
+function toggleNotify() { Notification.requestPermission().then(p => notifyOn = p==='granted'); }
+
+function destroyVwPlayers() {
+  vwPlayers.forEach(p => { try { p.destroy(); } catch(e){} });
+  vwPlayers = [];
+}
+
+function renderVideoWall(d) {
+  const live = d.liveVideo || (d.dispatches||[]).filter(x => x.hasLiveVideo);
+  const grid = document.getElementById('vw-grid');
+  destroyVwPlayers();
+  if (!live.length) {
+    grid.innerHTML = '<div class="empty">目前無 StatusId=8 即時影像案件<br><small>案件進入執行中狀態後會自動出現</small></div>';
+    return;
+  }
+  grid.innerHTML = live.map((c,i) => `
+    <div class="vw-tile">
+      <h3>📹 ${c.ambulanceCode||'—'} · ${c.branch||'—'} · ${c.statusName||''}</h3>
+      <video id="vw${i}" muted autoplay controls></video>
+    </div>`).join('');
+  if (!mpegts.getFeatureList().mseLivePlayback) return;
+  live.forEach((c,i) => {
+    const url = c.mseUrl || c.streamUrl;
+    if (!url) return;
+    const v = document.getElementById('vw'+i);
+    const p = mpegts.createPlayer({type:'mse', isLive:true, url});
+    p.attachMediaElement(v); p.load(); p.play().catch(()=>{});
+    vwPlayers.push(p);
+  });
+}
+
+function showTab(tab) {
+  if (tab === 'video') {
+    document.getElementById('videowall').classList.add('open');
+    if (lastData) renderVideoWall(lastData);
+  }
+}
+
+function closeVideoWall() {
+  document.getElementById('videowall').classList.remove('open');
+  destroyVwPlayers();
+  document.getElementById('vw-grid').innerHTML = '';
+}
+
+let ticking = false;
+async function tick() {
+  if (ticking) return;
+  ticking = true;
+  try {
+    const d = await sync();
+    if (d) render(d);
+  } catch(e) {
+    document.getElementById('status').innerHTML = '<span class="glyphicon glyphicon-warning-sign"></span> 連線中斷';
+  } finally {
+    ticking = false;
+  }
+}
+
+let resizeTimer;
+function onResize() {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => map.invalidateSize(), 150);
+}
+
+async function start() {
+  if (pollTimer) clearInterval(pollTimer);
+  switchMobileView('map');
+  startEmicPolling();
+  syncEmicFilterUi();
+  await tick();
+  pollTimer = setInterval(tick, pollMs);
+  requestAnimationFrame(() => map.invalidateSize());
+  window.addEventListener('resize', onResize, {passive:true});
+  map.on('popupopen', (e) => {
+    const m = e.popup?._source;
+    if (m && m._ambCode) openPopupCode = m._ambCode;
+    pauseMapRefresh(10000);
+  });
+  map.on('popupclose', () => { openPopupCode = ''; });
+}
+
+probeSession().then(authed => {
+  if (authed) { showDashboard(); start(); }
+}).catch(() => {});
+</script>
+</body>
+</html>

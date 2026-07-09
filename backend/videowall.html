@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="utf-8">
+  <title>即時影像監看牆 — EPCR</title>
+  <style>
+    :root { --bg:#0a0e14; --card:#151c28; --border:#2d3a4f; --text:#e7ecf3; --accent:#3b82f6; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); }
+    header { padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    a { color: var(--accent); text-decoration: none; }
+    .wall { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 12px; padding: 16px; }
+    .tile { background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    .tile-head { padding: 8px 12px; font-size: 0.85rem; border-bottom: 1px solid var(--border); }
+    .live .tile-head { border-color: #22c55e; color: #22c55e; }
+    video { width: 100%; height: 220px; background: #000; object-fit: contain; }
+    .empty { padding: 40px; text-align: center; color: #8b9cb3; grid-column: 1/-1; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/mpegts.js@1.7.3/dist/mpegts.js"></script>
+</head>
+<body>
+  <header>
+    <div><a href="/">← 儀表板</a> · 即時影像監看牆 (StatusId=8)</div>
+    <div id="meta">載入中…</div>
+  </header>
+  <div class="wall" id="wall"></div>
+  <script>
+    const players = [];
+    async function refresh() {
+      const d = await fetch('/api/data?' + Date.now()).then(r => r.json());
+      const live = d.liveVideo || d.dispatches?.filter(x => x.hasLiveVideo) || [];
+      document.getElementById('meta').textContent = `${live.length} 路即時 · 更新 ${new Date(d.updatedAt).toLocaleTimeString()}`;
+      const wall = document.getElementById('wall');
+      players.forEach(p => { try { p.destroy(); } catch(e){} });
+      players.length = 0;
+      if (!live.length) {
+        wall.innerHTML = '<div class="empty">目前無 StatusId=8 即時影像案件<br><small>新案件進入執行中狀態後會自動出現</small></div>';
+        return;
+      }
+      wall.innerHTML = live.map((c, i) => `
+        <div class="tile live">
+          <div class="tile-head">📹 ${c.ambulanceCode||'—'} · ${c.branch||'—'} · ${c.statusName||''}</div>
+          <video id="v${i}" muted autoplay controls></video>
+        </div>`).join('');
+      if (!mpegts.getFeatureList().mseLivePlayback) return;
+      live.forEach((c, i) => {
+        if (!c.mseUrl) return;
+        const v = document.getElementById('v' + i);
+        const p = mpegts.createPlayer({ type: 'mse', isLive: true, url: c.mseUrl });
+        p.attachMediaElement(v);
+        p.load();
+        p.play().catch(() => {});
+        players.push(p);
+      });
+    }
+    refresh();
+    setInterval(refresh, 20000);
+  </script>
+</body>
+</html>
