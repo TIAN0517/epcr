@@ -1,0 +1,138 @@
+{
+  "updated": "2026-07-06",
+  "auth": {
+    "type": "Bearer JWT",
+    "source": "MCI 4008 bundle SERVICE token 或使用者登入 Token",
+    "header": "Authorization: Bearer <token>"
+  },
+  "dashboard_pipeline": {
+    "poll_interval_sec": 10,
+    "output": "dashboard_data.json → 儀表板私密通道",
+    "fresh_only": true,
+    "windows_minutes": {
+      "dispatch": 180,
+      "vitals": 30,
+      "gps_live": 30,
+      "gps_max": 60,
+      "events": 60,
+      "images": 60,
+      "new_case_alert": 120
+    }
+  },
+  "tier1_realtime": [
+    {
+      "id": "gps_coords",
+      "port": 4000,
+      "method": "GET",
+      "path": "/DispatchRecords/listDispatchDevicesCoords",
+      "auth": true,
+      "use": "救護車即時 GPS 地圖",
+      "fresh_field": "Ambulance.Devices[0].updatedAt",
+      "dashboard_field": "gps"
+    },
+    {
+      "id": "active_dispatch",
+      "port": 4000,
+      "method": "GET",
+      "path": "/DispatchRecords",
+      "query": "StatusId[$in]=5,6,7,8",
+      "auth": true,
+      "use": "出勤列表、新案件、即時影像(StatusId=8)",
+      "fresh_field": "dispatchedAt（客戶端再過濾 ≤180 分鐘或 GPS 仍活躍）",
+      "dashboard_field": "dispatches, liveVideo, newCases"
+    },
+    {
+      "id": "vitals_trending",
+      "port": 4001,
+      "method": "GET",
+      "path": "/trendings",
+      "query": "sort=-createdAt&count=40",
+      "auth": false,
+      "use": "生命徵象 HR/SpO2/BP",
+      "fresh_field": "createdAt ≤30 分鐘",
+      "dashboard_field": "vitals"
+    },
+    {
+      "id": "live_video",
+      "port": null,
+      "method": "MSE",
+      "url": "https://mer2voip.tpf.gov.tw:30080/live?app=rtmp&stream=live{uuid}",
+      "auth": false,
+      "use": "即時車內影像（需 StatusId=8）",
+      "dashboard_field": "liveVideo, modal video"
+    }
+  ],
+  "tier2_on_demand": [
+    {
+      "id": "case_trendings",
+      "port": 4001,
+      "path": "/trendings?recordUuid={uuid}",
+      "auth": false,
+      "use": "單案生命徵象曲線（點擊案件）"
+    },
+    {
+      "id": "case_events",
+      "port": 4001,
+      "path": "/events?recordUuid={uuid}",
+      "auth": false,
+      "use": "單案事件時間軸"
+    },
+    {
+      "id": "case_images",
+      "port": 4001,
+      "path": "/ImageData?recordUuid={uuid}",
+      "auth": false,
+      "use": "心電/影像檔"
+    },
+    {
+      "id": "case_ai_ecg",
+      "port": 4001,
+      "path": "/extEcg/airesult/{uuid}",
+      "auth": false,
+      "use": "AI 心電判讀"
+    },
+    {
+      "id": "dispatch_detail",
+      "port": 4000,
+      "path": "/DispatchRecords/{uuid}",
+      "auth": true,
+      "use": "派遣地址、時間軸"
+    },
+    {
+      "id": "hospital_eta",
+      "port": 4002,
+      "path": "/Dispatches?recordUuid={pcrUuid}",
+      "auth": true,
+      "use": "送醫距離/ETA（未接入儀表板）"
+    }
+  ],
+  "tier3_optional": [
+    {
+      "id": "branch_stats",
+      "port": 4000,
+      "path": "/Branches/listBranchWithCaseRecordAndAmbulance",
+      "auth": true,
+      "use": "分隊出勤統計（儀表板底部，非即時案件）"
+    },
+    {
+      "id": "recent_events",
+      "port": 4001,
+      "path": "/events?sort=-Timestamp&count=15",
+      "auth": false,
+      "use": "全域近期事件（≤60 分鐘）"
+    },
+    {
+      "id": "recent_images",
+      "port": 4001,
+      "path": "/ImageData?sort=-createdAt&count=10",
+      "auth": false,
+      "use": "全域近期影像（≤60 分鐘）"
+    }
+  ],
+  "not_used_stale": [
+    "24h 派遣全表（含結案前殭屍 Status 5-8）",
+    "GPS 超過 60 分鐘未更新點位",
+    "生命徵象超過 30 分鐘",
+    "socket.io（event 名稱未逆向，改 HTTP 輪詢）"
+  ]
+}

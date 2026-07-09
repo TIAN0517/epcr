@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="utf-8">
+  <title>案件詳情 — EPCR</title>
+  <style>
+    :root { --bg:#0f1419; --card:#1a2332; --border:#2d3a4f; --text:#e7ecf3; --muted:#8b9cb3; --accent:#3b82f6; }
+    body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+    a { color: var(--accent); }
+    h1 { font-size: 1.2rem; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+    @media(max-width:800px){ .grid { grid-template-columns: 1fr; } }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+    .card h2 { font-size: 0.9rem; color: var(--muted); margin-bottom: 12px; }
+    table { width: 100%; font-size: 0.82rem; border-collapse: collapse; }
+    td, th { padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: left; }
+    video { width: 100%; max-height: 360px; background: #000; border-radius: 6px; }
+    .timeline li { margin: 6px 0; font-size: 0.85rem; }
+    .tag { display: inline-block; background: rgba(59,130,246,.2); padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/mpegts.js@1.7.3/dist/mpegts.js"></script>
+</head>
+<body>
+  <a href="/">← 返回儀表板</a>
+  <h1 id="title">案件載入中…</h1>
+  <p class="tag" id="idtag"></p>
+  <div class="grid">
+    <div class="card"><h2>即時影像</h2><video id="player" controls muted autoplay></video></div>
+    <div class="card"><h2>派遣資訊</h2><div id="dispatch-info">—</div></div>
+    <div class="card"><h2>生命徵象</h2><table><thead><tr><th>時間</th><th>HR</th><th>SpO2</th><th>BP</th></tr></thead><tbody id="vitals"></tbody></table></div>
+    <div class="card"><h2>AI 心電分析</h2><div id="ai-ecg">—</div></div>
+    <div class="card"><h2>事件時間軸</h2><ul class="timeline" id="events"></ul></div>
+    <div class="card"><h2>心電圖/影像</h2><div id="images"></div></div>
+  </div>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const uuid = params.get('uuid') || params.get('dispatch') || '';
+    document.getElementById('title').textContent = '案件 ' + (uuid.slice(0,8) + '…');
+    document.getElementById('idtag').textContent = uuid;
+
+    async function load() {
+      const q = params.get('uuid') ? 'uuid=' + uuid : 'dispatch=' + uuid;
+      const d = await fetch('/api/case?' + q).then(r => r.json());
+      if (d.error) { document.getElementById('title').textContent = '錯誤: ' + d.error; return; }
+
+      const vit = document.getElementById('vitals');
+      vit.innerHTML = (d.trendings||[]).slice(0,15).map(t =>
+        `<tr><td>${new Date(t.createdAt).toLocaleTimeString()}</td><td>${t.hr??'—'}</td><td>${t.spo2??'—'}</td><td>${t.NBPm??'—'}</td></tr>`
+      ).join('') || '<tr><td colspan="4">無資料</td></tr>';
+
+      const ev = document.getElementById('events');
+      ev.innerHTML = (d.events||[]).slice(0,20).map(e =>
+        `<li>${new Date(e.Timestamp||e.createdAt).toLocaleString()} — ${e.EventType||e.type||JSON.stringify(e).slice(0,60)}</li>`
+      ).join('') || '<li>無事件</li>';
+
+      const ai = document.getElementById('ai-ecg');
+      ai.innerHTML = (d.aiEcg||[]).map(r => {
+        const res = (r.ImageDataAIResults||[]).map(x => x.result||x.label).join(', ');
+        return `<p><b>${r.createdAt||''}</b> ${res||JSON.stringify(r).slice(0,100)}</p>`;
+      }).join('') || '無 AI 分析';
+
+      const im = document.getElementById('images');
+      im.innerHTML = (d.images||[]).map(i =>
+        `<p><a href="${i.url}" target="_blank">${i.fileName||i.id}</a> <small>${i.createdAt||''}</small></p>`
+      ).join('') || '無影像';
+
+      if (d.dispatch) {
+        const x = d.dispatch;
+        document.getElementById('dispatch-info').innerHTML =
+          `<p>救護車: ${x.Ambulance?.code||'—'}</p><p>分隊: ${x.Ambulance?.Branch?.name||'—'}</p><p>派遣: ${x.dispatchedAt||'—'}</p><p>狀態: ${x.StatusId||'—'}</p>`;
+      }
+
+      if (d.streamUrl && mpegts.getFeatureList().mseLivePlayback) {
+        const player = document.getElementById('player');
+        const flv = mpegts.createPlayer({ type: 'mse', isLive: true, url: d.streamUrl });
+        flv.attachMediaElement(player);
+        flv.load();
+        flv.play().catch(() => {});
+      }
+    }
+    load();
+  </script>
+</body>
+</html>
