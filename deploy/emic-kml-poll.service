@@ -1,0 +1,20 @@
+[Unit]
+Description=EPCR optional 378.kml poller
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/epcr/backend
+EnvironmentFile=-/opt/epcr/backend/emic_push.env
+Environment=EMIC_KML_URL=https://gis2.emic.gov.tw/EMICData/378.kml
+Environment=EMIC_KML_PUSH_REGION=all
+Environment=EMIC_KML_POLL_SEC=1
+Environment=EMIC_KML_JSON=/opt/epcr/backend/data/emic_kml.json
+ExecStart=/usr/bin/python3 /opt/epcr/backend/emic_kml_poll.py
+Restart=always
+RestartSec=15
+
+[Install]
+WantedBy=multi-user.target

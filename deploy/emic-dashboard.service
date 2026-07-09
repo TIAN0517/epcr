@@ -1,0 +1,24 @@
+[Unit]
+Description=EPCR Dashboard + Monitor (Python)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+# 改成你的 checkout 路徑
+WorkingDirectory=/opt/epcr/backend
+EnvironmentFile=-/opt/epcr/backend/emic_features.env
+Environment=DASHBOARD_BIND=127.0.0.1
+Environment=DASHBOARD_PORT=8765
+Environment=POLL_INTERVAL=8
+Environment=NEW_CASE_MINUTES=15
+Environment=CASE_RETAIN_MINUTES=15
+Environment=DASHBOARD_PASSWORD=change-me
+ExecStartPre=/bin/bash /opt/epcr/backend/ensure_token.sh
+ExecStart=/usr/bin/python3 /opt/epcr/backend/server.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

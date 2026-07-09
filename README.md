@@ -1,32 +1,83 @@
-# epcr
+# EPCR — 智慧雲端動態救護儀表板
 
-新北 EPCR（epcr.tpf.gov.tw）即時 GPS／派遣整合 — 供 service119 推播「已出發／已到達（往現場）」。
+新北市消防 **EPCR** 即時救護車追蹤 **Web UI** + 可選 Python 監控後端。
 
-## 重點
+> 本 repo 只含**網站與監控程式碼**。Telegram 群推播在很多環境是**另一台機器**負責；此 VPS 預設可只跑 Web。
 
-- GPS：`GET /DispatchRecords/listDispatchDevicesCoords`（Bearer JWT）
-- 軌跡：官方只給當下點，需 5–10s 輪詢自行累積
-- 派遣：`StatusId` 5–8 + `departedAt` / `arrivedAt`
-- **不推**往醫院（`leftAt` 送醫）
+## 目錄結構
 
-## 設定 Token
-
-```bash
-cp epcr_secrets.env.example epcr_secrets.env
-# 編輯填入 EPCR_TOKEN=eyJ...
-bash scripts/epcr_check_token.sh
+```
+epcr/
+├── web/                 # Next.js 儀表板（正式站）
+├── backend/             # Python：EPCR 輪詢、告警、舊版 dashboard server
+├── deploy/              # systemd unit 範本
+└── docs/                # 補充說明
 ```
 
-## 檔案
-
-| 檔案 | 說明 |
+| 路徑 | 說明 |
 |------|------|
-| `epcr_client.py` | API 客戶端 |
-| `epcr_tracker.py` | 輪詢 + 推播邏輯（可掛 service119） |
-| `scripts/epcr_check_token.sh` | 驗證 JWT |
-| `tests/test_epcr_tracker.py` | 單元測試 |
+| `web/` | Next.js + Tailwind 全頁地圖 / 派遣 / 影像 |
+| `backend/monitor.py` | 輪詢 EPCR API（派遣、GPS、生命徵象） |
+| `backend/server.py` | 輕量 HTTP 儀表板 / 與 monitor 同進程 |
+| `backend/alerts.py` | 告警寫 log + 可選 Telegram |
+| `backend/emic_kml_poll.py` | 可選：378.kml 輪詢（可關） |
 
-## 注意
+## 快速開始（Web）
 
-- 勿把 `epcr_secrets.env` / JWT 提交進 git
-- 推完後請將 GitHub repo 設為 **private**
+```bash
+cd web
+cp .env.example .env
+# 編輯 DASHBOARD_PASSWORD 等
+bun install   # 或 npm install
+bun run build
+bun run start # 預設見 package.json / PORT
+```
+
+開發：
+
+```bash
+cd web && bun run dev
+```
+
+## 後端監控（可選）
+
+```bash
+cd backend
+cp emic_push.env.example emic_push.env
+cp emic_features.env.example emic_features.env
+# 需要有效 EPCR JWT（token.txt 或 ensure_token.sh）
+python3 server.py   # 內建啟動 monitor 執行緒
+```
+
+### 推播策略（若啟用 Telegram）
+
+- 只推 **接案 / 出發 / 到達**（StatusId 5→6→7）
+- 只推 **新北市** 案件
+- 新北只打 `telegram_routes.json` 內 **三個群**（三太子 + 最舊兩個 BOT）；其它新北群不要填
+
+## 部署
+
+參考 `deploy/*.service`，路徑請改成你的 checkout 目錄。
+
+典型拆分：
+
+- `emic-next` → Next.js standalone
+- `emic-dashboard` → Python `server.py` + monitor
+- `emic-kml-poll` → 可選 378.kml
+
+## 完整推送（本機有 token 時）
+
+```bash
+export GITHUB_TOKEN=ghp_xxxx
+python3 scripts/push_to_github.py
+```
+
+## 安全注意
+
+- **勿提交** `.env`、`token.txt`、Bot token、真實 chat_id
+- 儀表板請設強密碼 + 反代 HTTPS
+- EPCR JWT 屬敏感憑證，勿進版控
+
+## License
+
+Private / internal use.

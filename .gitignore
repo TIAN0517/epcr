@@ -1,7 +1,40 @@
-epcr_secrets.env
-data/epcr_secrets.env
-*.pkl
-__pycache__/
-*.pyc
+# deps / build
+node_modules/
+.next/
+dist/
+out/
+*.log
+.DS_Store
+
+# secrets & local env
 .env
-.venv/
+.env.*
+!.env.example
+!**/.env.example
+!**/*.env.example
+token.txt
+**/token.txt
+emic_push.env
+emic_features.env
+.env.production
+
+# runtime data
+backend/data/*
+!backend/data/.gitkeep
+**/*.db
+**/*.db-*
+**/alerts_history.jsonl
+**/dashboard_data.json
+**/known_cases.json
+**/emic_kml.json
+**/emic_kml_known.json
+**/emic_kml_alerts.json
+**/gps_cases.json
+**/new_cases.json
+**/addr_cache.json
+**/monitor_state.json
+
+# IDE
+.idea/
+.vscode/
+*.swp

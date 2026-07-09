@@ -1,0 +1,19 @@
+[Unit]
+Description=EPCR Dashboard (Next.js)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/epcr/web/.next/standalone
+EnvironmentFile=-/opt/epcr/web/.env.production
+Environment=PORT=3010
+Environment=HOSTNAME=127.0.0.1
+# 需要本機安裝 bun 或改成 node
+ExecStart=/usr/local/bin/bun server.js
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
